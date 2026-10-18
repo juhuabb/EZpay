@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>支付管理</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+.filter-bar { margin-bottom: 15px; display: flex; gap: 10px; align-items: center; }
+.stat-box { display: flex; gap: 15px; margin-bottom: 15px; }
+.stat-item { background: #fff; border-radius: 8px; padding: 15px 20px; flex: 1; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.stat-num { font-size: 24px; font-weight: 700; color: #2979FF; }
+.stat-label { font-size: 13px; color: #999; margin-top: 4px; }
+.stat-num.green { color: #4CAF50; }
+.stat-num.orange { color: #FF9800; }
+.stat-num.gray { color: #999; }
+</style>
+</head>
+<body style="padding:20px;background:#f5f6fa">
+<div style="background:#fff;padding:20px;border-radius:8px">
+<h3 style="margin-bottom:15px">支付管理 - 商户API支付订单</h3>
+
+<div class="stat-box" id="statBox">
+  <div class="stat-item"><div class="stat-num" id="statTotal">0</div><div class="stat-label">总订单数</div></div>
+  <div class="stat-item"><div class="stat-num green" id="statPaid">0</div><div class="stat-label">已支付</div></div>
+  <div class="stat-item"><div class="stat-num orange" id="statPending">0</div><div class="stat-label">待支付</div></div>
+  <div class="stat-item"><div class="stat-num" id="statAmount">0.00</div><div class="stat-label">已支付总额(积分)</div></div>
+</div>
+
+<div class="filter-bar" style="flex-wrap:wrap">
+  <input type="text" id="filterMerchant" placeholder="商户名称" class="layui-input" style="width:160px;display:inline-block">
+  <select id="filterStatus" lay-filter="filterStatus" style="height:36px;border:1px solid #e6e6e6;border-radius:4px;padding:0 10px">
+    <option value="">全部状态</option>
+    <option value="0">待支付</option>
+    <option value="1">已支付</option>
+    <option value="2">已退款</option>
+    <option value="3">已取消</option>
+    <option value="4">已过期</option>
+  </select>
+  <input type="text" id="filterOrderNo" placeholder="订单号/商户订单号" class="layui-input" style="width:200px;display:inline-block">
+  <input type="text" id="filterDate" placeholder="下单日期范围" class="layui-input" style="width:240px;display:inline-block;background:#fff;cursor:pointer" readonly>
+  <button class="layui-btn layui-btn-sm" id="btnSearch">搜索</button>
+  <button class="layui-btn layui-btn-sm layui-btn-primary" id="btnReset">重置</button>
+</div>
+
+<table class="layui-table" id="t"></table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+layui.use(['table','layer','form','laydate'], function(){
+  var table = layui.table;
+  var layer = layui.layer;
+  var laydate = layui.laydate;
+  var $ = layui.$;
+
+  var currentFilter = { status: '', keyword: '', start_date: '', end_date: '', merchant_name: '' };
+
+  // 下单日期范围选择
+  laydate.render({
+    elem: '#filterDate',
+    type: 'date',
+    range: '~',
+    trigger: 'click',
+    done: function(value){
+      var parts = value.split('~');
+      currentFilter.start_date = parts.length === 2 ? $.trim(parts[0]) : '';
+      currentFilter.end_date = parts.length === 2 ? $.trim(parts[1]) : '';
+    }
+  });
+
+  function loadTable(){
+    table.render({
+      elem: '#t',
+      url: '/index/adminPaymentOrderListData',
+      where: currentFilter,
+      headers: {'X-Requested-With':'XMLHttpRequest'},
+      parseData: function(r){
+        if(r.code===0){
+          return {code:0, data: r.data.list||[], count: r.data.total||0};
+        }
+        return {code:1, data:[], count:0};
+      },
+      page: true,
+      limit: 15,
+      limits: [15,30,50],
+      cols: [[
+        {field:'id', title:'ID', width:60},
+        {field:'order_no', title:'支付订单号', width:180},
+        {field:'merchant_name', title:'商户', width:160},
+        {field:'out_trade_no', title:'商户订单号', width:160},
+        {field:'subject', title:'订单标题', minWidth:200},
+        {field:'amount', title:'金额(积分)', width:110, templet:function(d){
+          return '<span style="font-weight:600;color:#FF9800">'+parseFloat(d.amount||0).toFixed(2)+'</span>';
+        }},
+        {field:'status', title:'状态', width:90, templet:function(d){
+          if(d.status===1) return '<span style="color:green;font-weight:bold">已支付</span>';
+          if(d.status===0) return '<span style="color:orange;font-weight:bold">待支付</span>';
+          if(d.status===2) return '<span style="color:#9C27B0;font-weight:bold">已退款</span>';
+          if(d.status===3) return '<span style="color:gray">已取消</span>';
+          if(d.status===4) return '<span style="color:gray">已过期</span>';
+          return '<span style="color:gray">未知</span>';
+        }},
+        {field:'notify_status', title:'通知状态', width:90, templet:function(d){
+          if(d.notify_status===1) return '<span style="color:green">已通知</span>';
+          if(d.notify_status===2) return '<span style="color:red">通知失败</span>';
+          return '<span style="color:gray">未通知</span>';
+        }},
+        {field:'paid_at', title:'支付时间', width:160, templet:function(d){
+          return d.paid_at || '-';
+        }},
+        {field:'created_at', title:'创建时间', width:160},
+        {title:'操作', width:220, toolbar:'#actionBar'}
+      ]],
+      done: function(res){
+        // 更新统计
+        if(res && res.data){
+          updateStats();
+        }
+      }
+    });
+  }
+
+  function updateStats(){
+    var params = new URLSearchParams({stats: '1'});
+    if(currentFilter.status) params.set('status', currentFilter.status);
+    if(currentFilter.keyword) params.set('keyword', currentFilter.keyword);
+    if(currentFilter.merchant_name) params.set('merchant_name', currentFilter.merchant_name);
+    if(currentFilter.start_date) params.set('start_date', currentFilter.start_date);
+    if(currentFilter.end_date) params.set('end_date', currentFilter.end_date);
+    fetch('/index/adminPaymentOrderListData?' + params.toString(), {headers:{'X-Requested-With':'XMLHttpRequest'}})
+      .then(function(r){return r.json();})
+      .then(function(res){
+        if(res.code===0 && res.data){
+          $('#statTotal').text(res.data.total || 0);
+          $('#statPaid').text(res.data.paid_count || 0);
+          $('#statPending').text(res.data.pending_count || 0);
+          $('#statAmount').text(parseFloat(res.data.paid_amount || 0).toFixed(2));
+        }
+      })
+      .catch(function(){});
+  }
+
+  loadTable();
+  updateStats();
+
+  $('#btnSearch').on('click', function(){
+    currentFilter.status = $('#filterStatus').val();
+    currentFilter.keyword = $('#filterOrderNo').val().trim();
+    currentFilter.merchant_name = $('#filterMerchant').val().trim();
+    table.reload('t', { where: currentFilter, page: { curr: 1 } });
+    updateStats();
+  });
+
+  $('#btnReset').on('click', function(){
+    $('#filterStatus').val('');
+    $('#filterOrderNo').val('');
+    $('#filterMerchant').val('');
+    $('#filterDate').val('');
+    currentFilter = { status: '', keyword: '', start_date: '', end_date: '', merchant_name: '' };
+    table.reload('t', { where: currentFilter, page: { curr: 1 } });
+    updateStats();
+  });
+
+  table.on('tool(t)', function(obj){
+    var data = obj.data;
+    if(obj.event === 'detail'){
+      var html = '<div style="padding:15px;line-height:2">';
+      html += '<img src="/img/2.jpg">';
+      html += '</div>';
+      layer.open({
+        type: 1,
+        title: '订单详情 #'+data.id,
+        area: ['550px', '600px'],
+        content: html
+      });
+    } else if(obj.event === 'notify'){
+      layer.confirm('确认重新发送异步通知到商户？<br>通知地址：'+(data.notify_url||'-'), function(index){
+        layer.close(index);
+        var loadIndex = layer.load(1);
+        fetch('/index/adminPaymentOrderResendNotify', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({id: data.id})
+        }).then(function(r){return r.json();}).then(function(res){
+          layer.close(loadIndex);
+          if(res.code===0 && res.data){
+            var d = res.data;
+            var icon = d.success ? 1 : 2;
+            var title = d.success ? '通知发送成功' : '通知发送失败';
+            var html = '<div style="padding:15px;line-height:2;font-size:14px">';
+            html += '<b>结果：</b>'+(d.success?'<span style="color:green;font-weight:bold">成功</span>':'<span style="color:red;font-weight:bold">失败</span>')+'<br>';
+            html += '<b>HTTP状态码：</b>'+(d.http_code||'-')+'<br>';
+            if(d.error){ html += '<b>错误信息：</b><span style="color:red">'+d.error+'</span><br>'; }
+            if(d.response){
+              html += '<b>商户响应：</b><br>';
+              html += '<div style="background:#f5f5f5;padding:10px;border-radius:4px;word-break:break-all;max-height:200px;overflow:auto;font-family:monospace;font-size:12px">'+d.response+'</div>';
+            }
+            html += '</div>';
+            layer.open({
+              type: 1,
+              title: title,
+              area: ['500px', '380px'],
+              content: html,
+              btn: ['关闭'],
+              yes: function(idx){ layer.close(idx); }
+            });
+            // 刷新表格更新通知状态
+            table.reload('t', { where: currentFilter });
+            updateStats();
+          } else {
+            layer.msg(res.msg || '体验系统不具备该权限', {icon: 2});
+          }
+        }).catch(function(e){
+          layer.close(loadIndex);
+          layer.msg('请求提示: 体验系统不具备该功能操作权限');
+        });
+      });
+    } else if(obj.event === 'delete'){
+      var isPaid = (data.status === 1 || data.status === 2);
+      var tip = isPaid
+        ? '该订单为「'+getStatusText(data.status)+'」状态，删除仅移除列表记录，<b style="color:red">不会退款、不会回滚账户积分余额</b>。<br>确认删除订单 #'+data.id+'（'+data.order_no+'）？'
+        : '确认删除订单 #'+data.id+'（'+data.order_no+'）？<br>删除后不可恢复。';
+      layer.confirm(tip, {title:'删除确认', icon:3, area:['420px','auto']}, function(index){
+        layer.close(index);
+        var loadIndex = layer.load(1);
+        fetch('/index/adminPaymentOrderDelete', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json', 'X-Requested-With':'XMLHttpRequest'},
+          body: JSON.stringify({id: data.id})
+        }).then(function(r){return r.json();}).then(function(res){
+          layer.close(loadIndex);
+          if(res.code===0){
+            layer.msg('删除成功', {icon: 1});
+            obj.del();
+            updateStats();
+          } else {
+            layer.msg(res.msg || '请不要删除演示系统中的数据，感谢', );
+          }
+        }).catch(function(e){
+          layer.close(loadIndex);
+          layer.msg('请不要删除演示系统中的数据，感谢');
+        });
+      });
+    }
+  });
+
+  function getStatusText(s){
+    var m = {0:'待支付',1:'已支付',2:'已退款',3:'已取消',4:'已过期'};
+    return m[s] || '未知';
+  }
+  function getNotifyText(s){
+    var m = {0:'未通知',1:'已通知',2:'通知失败'};
+    return m[s] || '未知';
+  }
+});
+</script>
+
+<script type="text/html" id="actionBar">
+  <a class="layui-btn layui-btn-xs" lay-event="detail">详情</a>
+  {{# if(d.status===1){ }}
+  <a class="layui-btn layui-btn-xs layui-btn-warm" lay-event="notify">重发通知</a>
+  {{# } }}
+  <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="delete">删除</a>
+</script>
+
+</body></html>

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>游戏管理</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+    <script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+    <style>
+        .game-card { padding: 15px; margin-bottom: 10px; border: 1px solid #e6e6e6; border-radius: 5px; background: #fff; }
+        .prize-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+        .prize-row input, .prize-row select { max-width: 110px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .my-tab-bar { border-bottom: 2px solid #f0f0f0; margin-bottom: 15px; padding-bottom: 0; }
+        .my-tab-bar span { display: inline-block; padding: 8px 20px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; font-size: 14px; }
+        .my-tab-bar span.active { border-bottom-color: #1E9FFF; color: #1E9FFF; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="layui-fluid">
+    <div class="layui-card">
+        <div class="layui-card-header">
+            <div class="my-tab-bar">
+                <span class="active" onclick="switchTab('config')">游戏配置</span>
+                <span onclick="switchTab('records')">游戏记录</span>
+            </div>
+        </div>
+        <div class="layui-card-body">
+            <div id="tab-config" class="tab-content active">
+                <div id="gameList"></div>
+            </div>
+            <div id="tab-records" class="tab-content">
+                <div class="layui-form" style="margin-bottom:10px;">
+                    <select id="recordGameType">
+                        <option value="">全部游戏</option>
+                        <option value="wheel">幸运转盘</option>
+                        <option value="redpacket">天降红包</option>
+                        <option value="slot">水果铃铛</option>
+                    </select>
+                    <button class="layui-btn layui-btn-sm" onclick="loadRecords(1)">查询</button>
+                </div>
+                <table class="layui-table">
+                    <thead><tr>
+                        <th>ID</th><th>用户</th><th>游戏</th><th>结果</th><th>奖品</th>
+                        <th>消耗</th><th>时间</th>
+                    </tr></thead>
+                    <tbody id="recordBody"></tbody>
+                </table>
+                <div id="recordPage"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="gameEditDialog" style="display:none;padding:20px;">
+    <form class="layui-form" id="gameEditForm">
+        <input type="hidden" name="game_type" id="editGameType">
+        <div class="layui-form-item">
+            <label class="layui-form-label">游戏名称</label>
+            <div class="layui-input-block">
+                <input type="text" class="layui-input" id="editGameName" readonly>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">游戏描述</label>
+            <div class="layui-input-block">
+                <input type="text" name="game_desc" id="editGameDesc" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">启用</label>
+            <div class="layui-input-block">
+                <input type="checkbox" name="enabled" id="editEnabled" lay-skin="switch" lay-text="开启|关闭">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">触发条件</label>
+            <div class="layui-input-block">
+                <select name="trigger_type" id="editTriggerType">
+                    <option value="none">无限制(开启即可玩)</option>
+                    <option value="trade_count">交易满N笔解锁</option>
+                    <option value="recharge_amount">充值满N金额解锁</option>
+                    <option value="points_exchange">用积分兑换次数</option>
+                    <option value="balance">用余额消费玩</option>
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item" id="triggerValueRow">
+            <label class="layui-form-label" id="triggerValueLabel">条件值</label>
+            <div class="layui-input-block">
+                <input type="number" name="trigger_value" id="editTriggerValue" class="layui-input" step="0.01" value="0">
+            </div>
+        </div>
+        <div class="layui-form-item" id="costRow" style="display:none;">
+            <label class="layui-form-label">每次消耗</label>
+            <div class="layui-input-block">
+                <input type="number" name="cost_value" id="editCostValue" class="layui-input" step="0.01" value="0">
+                <span class="layui-form-mid" id="costUnit">积分</span>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">每日限制</label>
+            <div class="layui-input-block">
+                <input type="number" name="daily_limit" id="editDailyLimit" class="layui-input" value="0">
+                <span class="layui-form-mid">0=不限</span>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <div class="layui-input-block">
+                <button type="button" class="layui-btn" onclick="saveGame()">保存配置</button>
+                <button type="button" class="layui-btn layui-btn-warm" onclick="showPrizePanel()">奖品设置</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div id="prizeDialog" style="display:none;padding:20px;">
+    <div style="margin-bottom:10px;">
+        <button class="layui-btn layui-btn-sm" onclick="addPrizeRow()">+ 添加奖品</button>
+        <span class="layui-form-mid" style="margin-left:10px;">概率总和建议=1000(千分比)</span>
+        <span id="probSum" class="layui-badge" style="margin-left:5px;">0</span>
+    </div>
+    <div style="display:flex;gap:8px;font-size:12px;color:#999;margin-bottom:5px;">
+        <span style="width:110px;">名称</span>
+        <span style="width:90px;">类型</span>
+        <span style="width:80px;">数值</span>
+        <span style="width:70px;">颜色</span>
+        <span style="width:60px;">概率</span>
+        <span>操作</span>
+    </div>
+    <div id="prizeList"></div>
+    <div style="margin-top:10px;">
+        <button class="layui-btn" onclick="savePrizes()">保存奖品</button>
+    </div>
+</div>
+
+<script>
+var currentEditGame = null;
+var gamesData = [];
+
+layui.use(['layer','form','laypage'], function(){
+    loadGames();
+});
+
+function getToken() {
+    return localStorage.getItem('admin_token') || '';
+}
+
+function switchTab(tab) {
+    document.querySelectorAll('.my-tab-bar span').forEach(function(el){ el.classList.remove('active'); });
+    event.target.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
+    document.getElementById('tab-' + tab).classList.add('active');
+    if (tab === 'records') loadRecords(1);
+}
+
+function loadGames() {
+    fetch('/index/adminGameListData', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'Authorization':'Bearer ' + getToken()}
+    }).then(function(r){ return r.json(); }).then(function(res){
+        if (res.code !== 0) { layui.layer.msg(res.msg || '加载失败'); return; }
+        renderGames(res.data || []);
+    }).catch(function(e){ layui.layer.msg('网络错误'); });
+}
+
+function renderGames(games) {
+    gamesData = games;
+    var typeNames = {wheel:'转盘', redpacket:'红包', slot:'铃铛'};
+    var triggerNames = {none:'无限制', trade_count:'交易笔数', recharge_amount:'充值金额', points_exchange:'积分兑换', balance:'余额消费'};
+    var html = '';
+    games.forEach(function(g){
+        var badge = g.enabled == 1 ? '<span class="layui-badge layui-bg-green">已启用</span>' : '<span class="layui-badge layui-bg-gray">未启用</span>';
+        var triggerText = triggerNames[g.trigger_type] || '无';
+        if (g.trigger_value > 0 && g.trigger_type !== 'none') triggerText += ' ' + g.trigger_value;
+        var costText = g.cost_type === 'free' ? '免费' : (g.cost_value + ' ' + (g.cost_type === 'points' ? '积分' : '余额'));
+        var limitText = g.daily_limit > 0 ? (g.daily_limit + '次/天') : '不限';
+        html += '<div class="game-card">';
+        html += '<h3 style="display:inline-block;margin:0;">' + g.game_name + ' ' + badge + '</h3>';
+        html += '<p style="color:#666;margin:5px 0;">' + (g.game_desc||'') + '</p>';
+        html += '<p style="margin:5px 0;font-size:13px;">触发: ' + triggerText + ' | 消耗: ' + costText + ' | 限制: ' + limitText + '</p>';
+        html += '<button class="layui-btn layui-btn-sm" onclick="editGame(\'' + g.game_type + '\')">配置</button>';
+        html += '</div>';
+    });
+    document.getElementById('gameList').innerHTML = html || '<p style="text-align:center;color:#999;padding:40px;">暂无游戏配置</p>';
+}
+
+function editGame(gameType) {
+    var g = null;
+    for (var i = 0; i < gamesData.length; i++) {
+        if (gamesData[i].game_type === gameType) { g = gamesData[i]; break; }
+    }
+    if (!g) { layui.layer.msg('数据异常'); return; }
+    currentEditGame = g;
+    document.getElementById('editGameType').value = g.game_type;
+    document.getElementById('editGameName').value = g.game_name;
+    document.getElementById('editGameDesc').value = g.game_desc || '';
+    document.getElementById('editTriggerValue').value = g.trigger_value || 0;
+    document.getElementById('editCostValue').value = g.cost_value || 0;
+    document.getElementById('editDailyLimit').value = g.daily_limit || 0;
+
+    layui.use(['form','layer'], function(){
+        var form = layui.form;
+        document.getElementById('editTriggerType').value = g.trigger_type || 'none';
+        form.render('select');
+        document.getElementById('editEnabled').checked = (g.enabled == 1);
+        form.render('checkbox');
+        updateTriggerUI(g.trigger_type || 'none');
+        layui.layer.open({
+            type: 1, title: '编辑 - ' + g.game_name,
+            area: ['500px', '560px'], content: layui.$('#gameEditDialog')
+        });
+    });
+}
+
+function updateTriggerUI(triggerType) {
+    var labelMap = {none:'条件值', trade_count:'交易笔数', recharge_amount:'充值金额', points_exchange:'—', balance:'—'};
+    document.getElementById('triggerValueLabel').textContent = labelMap[triggerType] || '条件值';
+    var showTrigger = (triggerType !== 'none' && triggerType !== '' && triggerType !== 'points_exchange' && triggerType !== 'balance');
+    document.getElementById('triggerValueRow').style.display = showTrigger ? 'block' : 'none';
+    var showCost = (triggerType === 'points_exchange' || triggerType === 'balance');
+    document.getElementById('costRow').style.display = showCost ? 'block' : 'none';
+    document.getElementById('costUnit').textContent = (triggerType === 'balance') ? '余额' : '积分';
+}
+
+function saveGame() {
+    var triggerType = document.getElementById('editTriggerType').value;
+    var data = {
+        game_type: document.getElementById('editGameType').value,
+        game_desc: document.getElementById('editGameDesc').value,
+        enabled: document.getElementById('editEnabled').checked ? 1 : 0,
+        trigger_type: triggerType,
+        trigger_value: parseFloat(document.getElementById('editTriggerValue').value) || 0,
+        cost_value: parseFloat(document.getElementById('editCostValue').value) || 0,
+        daily_limit: parseInt(document.getElementById('editDailyLimit').value) || 0
+    };
+    if (triggerType === 'points_exchange') data.cost_type = 'points';
+    else if (triggerType === 'balance') data.cost_type = 'balance';
+    else data.cost_type = 'free';
+
+    fetch('/index/adminGameSave', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'Authorization':'Bearer ' + getToken()},
+        body: JSON.stringify(data)
+    }).then(function(r){ return r.json(); }).then(function(res){
+        if (res.code === 0) { layui.layer.msg('保存成功'); loadGames(); }
+        else layui.layer.msg(res.msg || '保存失败');
+    }).catch(function(e){ layui.layer.msg('网络错误'); });
+}
+
+function showPrizePanel() {
+    if (!currentEditGame) return;
+    loadPrizes(currentEditGame.game_type);
+    layui.layer.open({
+        type: 1, title: '奖品管理 - ' + currentEditGame.game_name,
+        area: ['680px', '560px'], content: layui.$('#prizeDialog')
+    });
+}
+
+function loadPrizes(gameType) {
+    fetch('/index/adminPrizeListData', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'Authorization':'Bearer ' + getToken()},
+        body: JSON.stringify({game_type: gameType})
+    }).then(function(r){ return r.json(); }).then(function(res){
+        if (res.code === 0) renderPrizes(res.data || []);
+        else layui.layer.msg(res.msg || '加载失败');
+    }).catch(function(e){ layui.layer.msg('网络错误'); });
+}
+
+function renderPrizes(prizes) {
+    var html = '';
+    prizes.forEach(function(p){
+        html += '<div class="prize-row" data-id="' + p.id + '">';
+        html += '<input type="text" class="layui-input prize-name" value="' + (p.prize_name||'') + '" placeholder="名称" style="width:110px;">';
+        html += '<select class="layui-input prize-type" style="width:90px;">';
+        html += '<option value="none"' + (p.prize_type==='none'?' selected':'')+'>不中奖</option>';
+        html += '<option value="points"' + (p.prize_type==='points'?' selected':'')+'>积分</option>';
+        html += '<option value="balance"' + (p.prize_type==='balance'?' selected':'')+'>余额</option>';
+        html += '</select>';
+        html += '<input type="number" class="layui-input prize-value" value="' + (p.prize_value||0) + '" step="0.01" style="width:80px;">';
+        html += '<input type="text" class="layui-input prize-icon" value="' + (p.icon||'') + '" placeholder="#FF0000" style="width:70px;">';
+        html += '<input type="number" class="layui-input prize-prob" value="' + (p.probability||0) + '" min="0" max="1000" style="width:60px;">';
+        html += '<span class="layui-form-mid">‰</span>';
+        html += '<button class="layui-btn layui-btn-danger layui-btn-sm" onclick="this.parentNode.remove();updateProbSum();">删</button>';
+        html += '</div>';
+    });
+    document.getElementById('prizeList').innerHTML = html;
+    updateProbSum();
+}
+
+function addPrizeRow() {
+    var div = document.createElement('div');
+    div.className = 'prize-row';
+    div.setAttribute('data-id', '0');
+    div.innerHTML = '<input type="text" class="layui-input prize-name" value="" placeholder="名称" style="width:110px;">'
+        + '<select class="layui-input prize-type" style="width:90px;"><option value="none">不中奖</option><option value="points">积分</option><option value="balance">余额</option></select>'
+        + '<input type="number" class="layui-input prize-value" value="0" step="0.01" style="width:80px;">'
+        + '<input type="text" class="layui-input prize-icon" value="#FF6B6B" placeholder="#FF0000" style="width:70px;">'
+        + '<input type="number" class="layui-input prize-prob" value="100" min="0" max="1000" style="width:60px;">'
+        + '<span class="layui-form-mid">‰</span>'
+        + '<button class="layui-btn layui-btn-danger layui-btn-sm" onclick="this.parentNode.remove();updateProbSum();">删</button>';
+    document.getElementById('prizeList').appendChild(div);
+    updateProbSum();
+}
+
+function updateProbSum() {
+    var sum = 0;
+    document.querySelectorAll('.prize-prob').forEach(function(el){ sum += parseInt(el.value) || 0; });
+    var badge = document.getElementById('probSum');
+    badge.textContent = sum + '‰';
+    badge.className = sum === 1000 ? 'layui-badge layui-bg-green' : (sum > 1000 ? 'layui-badge layui-bg-red' : 'layui-badge layui-bg-orange');
+}
+
+function savePrizes() {
+    var rows = document.querySelectorAll('#prizeList .prize-row');
+    var prizes = [];
+    rows.forEach(function(row, idx){
+        prizes.push({
+            id: parseInt(row.getAttribute('data-id')) || 0,
+            game_type: currentEditGame.game_type,
+            prize_name: row.querySelector('.prize-name').value,
+            prize_type: row.querySelector('.prize-type').value,
+            prize_value: parseFloat(row.querySelector('.prize-value').value) || 0,
+            icon: row.querySelector('.prize-icon').value,
+            probability: parseInt(row.querySelector('.prize-prob').value) || 0,
+            sort: idx + 1
+        });
+    });
+    fetch('/index/adminPrizeSave', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'Authorization':'Bearer ' + getToken()},
+        body: JSON.stringify({game_type: currentEditGame.game_type, prizes: prizes})
+    }).then(function(r){ return r.json(); }).then(function(res){
+        if (res.code === 0) { layui.layer.msg('奖品保存成功'); loadPrizes(currentEditGame.game_type); }
+        else layui.layer.msg(res.msg || '保存失败');
+    }).catch(function(e){ layui.layer.msg('网络错误'); });
+}
+
+function loadRecords(page) {
+    var gameType = document.getElementById('recordGameType').value;
+    fetch('/index/adminGameRecordsData', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'Authorization':'Bearer ' + getToken()},
+        body: JSON.stringify({game_type: gameType, page: page, page_size: 20})
+    }).then(function(r){ return r.json(); }).then(function(res){
+        if (res.code !== 0) { layui.layer.msg(res.msg || '加载失败'); return; }
+        var typeNames = {wheel:'幸运转盘', redpacket:'天降红包', slot:'水果铃铛'};
+        var html = '';
+        (res.data.list||[]).forEach(function(r){
+            var winBadge = r.is_win ? '<span class="layui-badge layui-bg-orange">中奖</span>' : '<span class="layui-badge layui-bg-gray">未中</span>';
+            var prizeText = r.prize_type === 'none' ? r.prize_name : (r.prize_name + '(' + r.prize_value + ')');
+            var costText = r.cost_type === 'free' ? '免费' : (r.cost_value + (r.cost_type==='points'?'积分':'余额'));
+            var userName = r.nickname || r.username || ('ID:' + r.user_id);
+            html += '<tr><td>' + r.id + '</td><td>' + userName + '</td><td>' + (typeNames[r.game_type]||r.game_type) + '</td><td>' + winBadge + '</td><td>' + prizeText + '</td><td>' + costText + '</td><td>' + r.created_at + '</td></tr>';
+        });
+        document.getElementById('recordBody').innerHTML = html || '<tr><td colspan="7" style="text-align:center;color:#999;">暂无记录</td></tr>';
+        layui.use(['laypage'], function(){
+            layui.laypage.render({ elem: 'recordPage', count: res.data.total||0, limit: 20, curr: page, jump: function(obj){ if(obj.curr !== page) loadRecords(obj.curr); } });
+        });
+    }).catch(function(e){ layui.layer.msg('网络错误'); });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>投诉详情</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+body { background: #f0f2f5; padding: 20px; margin: 0; }
+.card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.info-row { display: flex; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+.info-label { width: 120px; color: #999; flex-shrink: 0; }
+.info-value { color: #333; }
+.proof-img { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; margin-right: 10px; cursor: pointer; border: 1px solid #eee; }
+.status-tag { padding: 2px 10px; border-radius: 4px; font-size: 12px; display: inline-block; }
+.status-0 { background: #fff7e6; color: #fa8c16; }
+.status-1 { background: #e6f7ff; color: #1890ff; }
+.status-2 { background: #f6ffed; color: #52c41a; }
+.chat-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.chat-header h3 { margin: 0; font-size: 15px; }
+.live-indicator { display: none; align-items: center; font-size: 12px; color: #52c41a; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #52c41a; margin-right: 5px; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+.new-msg-tip { display: none; background: #1890ff; color: #fff; font-size: 12px; padding: 4px 12px; border-radius: 12px; margin-bottom: 8px; text-align: center; transition: opacity 0.3s; }
+.chat-list-wrap { max-height: 400px; overflow-y: auto; padding-right: 5px; }
+.chat-list-wrap::-webkit-scrollbar { width: 4px; }
+.chat-list-wrap::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+.chat-item { display: flex; margin-bottom: 12px; }
+.chat-item.admin { flex-direction: row; }
+.chat-item.user { flex-direction: row-reverse; }
+.chat-bubble { max-width: 70%; padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; word-break: break-all; }
+.chat-item.admin .chat-bubble { background: #f0f0f0; }
+.chat-item.user .chat-bubble { background: #1890ff; color: #fff; }
+.chat-meta { font-size: 12px; color: #999; margin-bottom: 4px; }
+.chat-item.user .chat-meta { text-align: right; }
+.chat-img { max-width: 200px; max-height: 200px; border-radius: 6px; margin-top: 6px; cursor: pointer; display: block; }
+.reply-img-preview { position: relative; display: inline-block; margin-right: 10px; margin-bottom: 10px; }
+.reply-img-preview img { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid #eee; }
+.reply-img-preview .remove-img { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; background: #ff4d4f; color: #fff; border-radius: 50%; text-align: center; line-height: 18px; cursor: pointer; font-size: 12px; }
+.upload-btn { display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 80px; border: 1px dashed #d9d9d9; border-radius: 6px; cursor: pointer; color: #999; font-size: 24px; margin-bottom: 10px; }
+.upload-btn:hover { border-color: #1890ff; color: #1890ff; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2 style="font-size:16px;margin:0 0 15px 0;">
+    <a href="/index/adminComplaintList" style="font-size:14px;color:#1890ff;text-decoration:none;">&larr; 返回列表</a>
+    &nbsp; 投诉详情
+  </h2>
+  <div id="content"><p style="color:#999;text-align:center;">加载中...</p></div>
+</div>
+
+<div class="card" id="chatCard" style="display:none;">
+  <div class="chat-header">
+    <h3>对话记录</h3>
+    <div class="live-indicator" id="liveIndicator">
+      <div class="live-dot"></div>
+      <span>实时更新中</span>
+    </div>
+  </div>
+  <div class="new-msg-tip" id="newMsgTip">收到新消息</div>
+  <div class="chat-list-wrap" id="chatListWrap">
+    <div id="chatList"></div>
+  </div>
+</div>
+
+<div class="card" id="replyCard" style="display:none;">
+  <h3 style="font-size:15px;margin:0 0 10px 0;">回复投诉</h3>
+  <textarea id="replyText" class="layui-textarea" style="height:100px;margin-bottom:10px;" placeholder="请输入回复内容"></textarea>
+  <div id="replyImgArea" style="margin-bottom:10px;">
+    <div class="upload-btn" onclick="document.getElementById('replyImgInput').click()">+</div>
+    <input type="file" id="replyImgInput" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none;" onchange="uploadReplyImg(this)">
+  </div>
+  <button class="layui-btn" onclick="submitReply()">提交回复</button>
+  <button class="layui-btn layui-btn-normal" onclick="resolveComplaint()">标记已解决</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+var complaintId = {$complaintId|default=0};
+var lastMsgCount = 0;
+var pollTimer = null;
+var replyImgUrl = '';
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function getFullUrl(path) {
+  if (!path) return '';
+  if (typeof path !== 'string') return '';
+  if (path.indexOf('http') === 0) return path;
+  return 'https://wjf.oooiooo.com' + path;
+}
+
+function previewImg(url) {
+  layui.layer.open({ type: 1, title: '图片预览', area: ['600px','600px'], content: '<img src="' + url + '" style="width:100%;height:100%;object-fit:contain;">' });
+}
+
+function renderChat(msgs) {
+  if (!msgs || msgs.length === 0) {
+    document.getElementById('chatList').innerHTML = '<p style="color:#999;text-align:center;padding:20px;">暂无对话记录</p>';
+    document.getElementById('chatCard').style.display = 'block';
+    return;
+  }
+  var chatHtml = '';
+  msgs.forEach(function(m) {
+    var isAdmin = m.sender_type == 1;
+    var senderLabel = m.sender_text || (isAdmin ? '管理员' : '用户');
+    chatHtml += '<div class="chat-item ' + (isAdmin ? 'admin' : 'user') + '">';
+    chatHtml += '<div><div class="chat-meta">' + escapeHtml(senderLabel) + ' &middot; ' + (m.create_time || '') + '</div>';
+    chatHtml += '<div class="chat-bubble">';
+    if (m.content) {
+      chatHtml += escapeHtml(m.content);
+    }
+    if (m.image) {
+      var imgUrl = getFullUrl(m.image);
+      chatHtml += '<img src="' + imgUrl + '" class="chat-img" onclick="previewImg(\'' + imgUrl + '\')">';
+    }
+    chatHtml += '</div></div>';
+    chatHtml += '</div>';
+  });
+  document.getElementById('chatList').innerHTML = chatHtml;
+  document.getElementById('chatCard').style.display = 'block';
+  var wrap = document.getElementById('chatListWrap');
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function loadDetail() {
+  fetch('/index/adminComplaintDetailData?id=' + complaintId)
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      if (res.code !== 0) {
+        document.getElementById('content').innerHTML = '<p style="color:red;">' + (res.msg || '加载失败') + '</p>';
+        return;
+      }
+      var d = res.data.complaint;
+      var msgs = res.data.messages || [];
+      var statusClass = {0: 'status-0', 1: 'status-1', 2: 'status-2'};
+
+      var html = '';
+      html += '<div class="info-row"><div class="info-label">投诉ID</div><div class="info-value">#' + d.id + '</div></div>';
+      html += '<div class="info-row"><div class="info-label">订单号</div><div class="info-value">' + (d.order_no || '--') + '</div></div>';
+      html += '<div class="info-row"><div class="info-label">买方ID</div><div class="info-value">' + d.buyer_id + '</div></div>';
+      html += '<div class="info-row"><div class="info-label">卖方ID</div><div class="info-value">' + d.seller_id + '</div></div>';
+      html += '<div class="info-row"><div class="info-label">交易数量</div><div class="info-value">' + d.points_amount + ' 积分</div></div>';
+      html += '<div class="info-row"><div class="info-label">单价</div><div class="info-value">&yen;' + d.unit_price + '</div></div>';
+      html += '<div class="info-row"><div class="info-label">总金额</div><div class="info-value">&yen;' + d.total_price + '</div></div>';
+      html += '<div class="info-row"><div class="info-label">状态</div><div class="info-value"><span id="statusTag" class="status-tag ' + (statusClass[d.status] || '') + '">' + (d.status_text || '未知') + '</span></div></div>';
+      html += '<div class="info-row"><div class="info-label">提交时间</div><div class="info-value">' + (d.create_time || '--') + '</div></div>';
+      html += '<div class="info-row"><div class="info-label">问题描述</div><div class="info-value" style="white-space:pre-wrap;word-break:break-all;">' + (d.description || '--') + '</div></div>';
+
+      var images = d.proof_images || [];
+      if (images.length > 0) {
+        html += '<div class="info-row"><div class="info-label">支付凭证</div><div class="info-value">';
+        images.forEach(function(img) {
+          var fullUrl = getFullUrl(img);
+          html += '<img src="' + fullUrl + '" class="proof-img" onclick="previewImg(\'' + fullUrl + '\')">';
+        });
+        html += '</div></div>';
+      }
+
+      document.getElementById('content').innerHTML = html;
+      renderChat(msgs);
+      lastMsgCount = msgs.length;
+
+      if (d.status < 2) {
+        document.getElementById('replyCard').style.display = 'block';
+      } else {
+        document.getElementById('replyCard').style.display = 'none';
+      }
+    })
+    .catch(function(e) {
+      document.getElementById('content').innerHTML = '<p style="color:red;">请求失败：' + e.message + '</p>';
+    });
+}
+
+function refreshMessages() {
+  fetch('/index/adminComplaintDetailData?id=' + complaintId)
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      if (res.code !== 0) return;
+      var d = res.data.complaint;
+      var msgs = res.data.messages || [];
+
+      if (lastMsgCount > 0 && msgs.length > lastMsgCount) {
+        showNewMsgTip();
+      }
+
+      renderChat(msgs);
+      lastMsgCount = msgs.length;
+
+      var statusEl = document.getElementById('statusTag');
+      if (statusEl) {
+        var statusClass = {0: 'status-0', 1: 'status-1', 2: 'status-2'};
+        statusEl.className = 'status-tag ' + (statusClass[d.status] || '');
+        statusEl.textContent = d.status_text || '未知';
+      }
+
+      if (d.status >= 2) {
+        document.getElementById('replyCard').style.display = 'none';
+      } else {
+        document.getElementById('replyCard').style.display = 'block';
+      }
+    })
+    .catch(function(e) {});
+}
+
+function showNewMsgTip() {
+  var tip = document.getElementById('newMsgTip');
+  if (tip) {
+    tip.style.display = 'block';
+    tip.style.opacity = '1';
+    setTimeout(function() {
+      tip.style.opacity = '0';
+      setTimeout(function() { tip.style.display = 'none'; }, 300);
+    }, 2000);
+  }
+}
+
+function startPolling() {
+  stopPolling();
+  pollTimer = setInterval(refreshMessages, 5000);
+  document.getElementById('liveIndicator').style.display = 'flex';
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  document.getElementById('liveIndicator').style.display = 'none';
+}
+
+function uploadReplyImg(input) {
+  if (!input.files || !input.files[0]) return;
+  var formData = new FormData();
+  formData.append('file', input.files[0]);
+
+  var loadingIndex = layui.layer.load(2);
+  fetch('/index/adminComplaintUpload', {
+    method: 'POST',
+    body: formData
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    layui.layer.close(loadingIndex);
+    if (res.code === 0) {
+      replyImgUrl = res.data.url;
+      var previewHtml = '<div class="reply-img-preview"><img src="' + getFullUrl(replyImgUrl) + '"><span class="remove-img" onclick="removeReplyImg()">x</span></div>';
+      document.querySelector('.upload-btn').style.display = 'none';
+      var imgArea = document.getElementById('replyImgArea');
+      var existingPreview = imgArea.querySelector('.reply-img-preview');
+      if (existingPreview) { existingPreview.remove(); }
+      imgArea.insertAdjacentHTML('afterbegin', previewHtml);
+    } else {
+      layui.layer.msg(res.msg || '上传失败');
+    }
+  })
+  .catch(function(e) {
+    layui.layer.close(loadingIndex);
+    layui.layer.msg('上传失败：' + e.message);
+  });
+  input.value = '';
+}
+
+function removeReplyImg() {
+  replyImgUrl = '';
+  var preview = document.querySelector('.reply-img-preview');
+  if (preview) { preview.remove(); }
+  document.querySelector('.upload-btn').style.display = 'inline-flex';
+}
+
+function submitReply() {
+  var reply = document.getElementById('replyText').value.trim();
+  if (!reply && !replyImgUrl) { layui.layer.msg('请输入回复内容或上传图片'); return; }
+
+  var body = { content: reply };
+  if (replyImgUrl) { body.image = replyImgUrl; }
+
+  fetch('/index/adminComplaintReply?id=' + complaintId, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    layui.layer.msg(res.msg || (res.code === 0 ? '回复成功' : '演示系统无法回复，谢谢'));
+    if (res.code === 0) {
+      document.getElementById('replyText').value = '';
+      removeReplyImg();
+      lastMsgCount++;
+      setTimeout(refreshMessages, 300);
+    }
+  })
+  .catch(function(e) { layui.layer.msg('演示系统已经拒绝了你的请'); });
+}
+
+function resolveComplaint() {
+  layui.layer.confirm('确认标记为已解决？', function(index) {
+    fetch('/index/adminComplaintResolve?id=' + complaintId, { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        layui.layer.msg(res.msg || (res.code === 0 ? '操作成功' : '操作失败'));
+        if (res.code === 0) { setTimeout(refreshMessages, 300); }
+      })
+      .catch(function(e) { layui.layer.msg('演示系统已经拒绝了你的请求'); });
+    layui.layer.close(index);
+  });
+}
+
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    stopPolling();
+  } else {
+    refreshMessages();
+    startPolling();
+  }
+});
+
+loadDetail();
+startPolling();
+</script>
+</body>
+</html>

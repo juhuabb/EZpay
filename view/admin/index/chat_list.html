@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>在线客服</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f5f5}
+.chat-wrap{display:flex;height:calc(100vh - 0px);overflow:hidden}
+.sidebar{width:320px;background:#fff;border-right:1px solid #e8e8e8;display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-tabs{display:flex;border-bottom:1px solid #e8e8e8;background:#fafafa}
+.sidebar-tabs .tab{flex:1;padding:10px 4px;text-align:center;font-size:13px;cursor:pointer;color:#666;border-bottom:2px solid transparent;transition:all .2s}
+.sidebar-tabs .tab:hover{color:#2979FF}
+.sidebar-tabs .tab.active{color:#2979FF;border-bottom-color:#2979FF;font-weight:600;background:#fff}
+.sidebar-tabs .tab .tab-badge{display:inline-block;background:#ff5722;color:#fff;border-radius:10px;padding:0 5px;font-size:11px;line-height:16px;margin-left:2px;min-width:16px}
+.session-list{flex:1;overflow-y:auto}
+.session-item{padding:12px 15px;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background .15s}
+.session-item:hover{background:#f5f7fa}
+.session-item.active{background:#e3f2fd;border-left:3px solid #2979FF}
+.session-item .si-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.session-item .si-name{font-size:14px;font-weight:600;color:#333;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-item .si-time{font-size:11px;color:#999;flex-shrink:0}
+.session-item .si-preview{font-size:12px;color:#999;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px}
+.session-item .si-badge{background:#ff5722;color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;margin-left:6px}
+.session-item .si-tag{display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;margin-left:4px}
+.si-tag-unassigned{background:#fff3e0;color:#FF5722}
+.si-tag-assigned{background:#e8f5e9;color:#4CAF50}
+.si-tag-transfer{background:#fce4ec;color:#E91E63}
+.chat-main{flex:1;display:flex;flex-direction:column;background:#f5f5f5;min-width:0}
+.chat-header{height:56px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;justify-content:space-between;padding:0 20px;flex-shrink:0}
+.chat-header .ch-info{display:flex;align-items:center;gap:10px}
+.chat-header .ch-name{font-size:16px;font-weight:600;color:#333}
+.chat-header .ch-status{font-size:12px;color:#999}
+.chat-header .ch-actions{display:flex;gap:8px}
+.chat-header .ch-actions .layui-btn{height:32px;line-height:32px;padding:0 12px;font-size:13px}
+.msg-area{flex:1;overflow-y:auto;padding:15px 20px}
+.msg-empty{text-align:center;color:#ccc;padding:60px 0;font-size:14px}
+.msg-item{margin-bottom:16px;display:flex;flex-direction:column}
+.msg-item.msg-user{align-items:flex-end}
+.msg-item.msg-admin{align-items:flex-start}
+.msg-item.msg-system{align-items:center}
+.msg-sender{font-size:11px;color:#999;margin-bottom:3px}
+.msg-bubble{max-width:70%;padding:10px 14px;border-radius:12px;font-size:14px;line-height:1.6;word-break:break-all;position:relative}
+.msg-user .msg-bubble{background:#2979FF;color:#fff;border-bottom-right-radius:4px}
+.msg-admin .msg-bubble{background:#fff;color:#333;border-bottom-left-radius:4px;box-shadow:0 1px 2px rgba(0,0,0,0.08)}
+.msg-system .msg-bubble{background:transparent;color:#999;font-size:12px;border:1px dashed #ddd;border-radius:8px}
+.msg-time{font-size:10px;color:#bbb;margin-top:3px}
+.msg-image{max-width:200px;max-height:200px;border-radius:8px;cursor:pointer}
+.input-area{background:#fff;border-top:1px solid #e8e8e8;padding:12px 20px;flex-shrink:0}
+.input-row{display:flex;gap:10px;align-items:flex-end}
+.input-row textarea{flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:8px 12px;font-size:14px;resize:none;height:40px;max-height:120px;outline:none;transition:border-color .2s}
+.input-row textarea:focus{border-color:#2979FF}
+.input-row .layui-btn{height:40px;line-height:40px;padding:0 20px}
+.transfer-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:9999;display:none}
+.transfer-dialog{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:12px;padding:24px;width:420px;max-width:90vw;z-index:10000;display:none;box-shadow:0 8px 32px rgba(0,0,0,0.15)}
+.transfer-dialog h3{font-size:18px;margin-bottom:16px;color:#333}
+.transfer-dialog .form-group{margin-bottom:14px}
+.transfer-dialog label{display:block;font-size:13px;color:#666;margin-bottom:6px}
+.transfer-dialog select{width:100%;height:38px;border:1px solid #e0e0e0;border-radius:6px;padding:0 10px;font-size:14px}
+.transfer-dialog textarea{width:100%;border:1px solid #e0e0e0;border-radius:6px;padding:8px 10px;font-size:14px;resize:none;height:70px}
+.transfer-dialog .btn-row{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+.notify-popup{position:fixed;top:70px;right:20px;width:340px;background:#fff;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.12);z-index:9998;display:none;overflow:hidden}
+.notify-popup .np-header{background:#FF5722;color:#fff;padding:10px 16px;font-size:14px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.notify-popup .np-body{padding:14px 16px}
+.notify-popup .np-title{font-size:14px;color:#333;margin-bottom:6px}
+.notify-popup .np-desc{font-size:13px;color:#666;line-height:1.5}
+.notify-popup .np-actions{display:flex;gap:8px;margin-top:12px}
+.notify-popup .np-actions .layui-btn{height:32px;line-height:32px;font-size:13px;padding:0 16px}
+.notify-popup .np-close{cursor:pointer;font-size:16px}
+.declined-popup{position:fixed;top:70px;right:20px;width:300px;background:#fff3e0;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.12);z-index:9997;display:none;padding:14px 16px;border-left:4px solid #FF5722}
+.declined-popup .dp-title{font-size:14px;color:#333;font-weight:600;margin-bottom:4px}
+.declined-popup .dp-desc{font-size:13px;color:#666}
+.empty-chat{flex:1;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:15px}
+</style>
+</head>
+<body>
+<div class="chat-wrap">
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <div class="tab" data-tab="unassigned">待认领<span class="tab-badge" id="badge-unassigned" style="display:none">0</span></div>
+      <div class="tab active" data-tab="assigned">我的</div>
+      <div class="tab" data-tab="active">全部</div>
+      <div class="tab" data-tab="transfer_in">转给我<span class="tab-badge" id="badge-transfer" style="display:none">0</span></div>
+      <div class="tab" data-tab="closed">已关闭</div>
+    </div>
+    <div class="session-list" id="sessionList">
+      <div class="msg-empty">加载中...</div>
+    </div>
+  </div>
+  <div class="chat-main">
+    <div class="chat-header" id="chatHeader" style="display:none">
+      <div class="ch-info">
+        <span class="ch-name" id="chatUserName"></span>
+        <span class="ch-status" id="chatUserStatus"></span>
+      </div>
+      <div class="ch-actions">
+        <button class="layui-btn layui-btn-normal layui-btn-sm" id="btnTransfer" onclick="openTransferDialog()">转接</button>
+        <button class="layui-btn layui-btn-danger layui-btn-sm" id="btnClose" onclick="closeSession()">关闭会话</button>
+      </div>
+    </div>
+    <div class="msg-area" id="msgArea">
+      <div class="msg-empty">请从左侧选择一个会话开始聊天</div>
+    </div>
+    <div class="input-area" id="inputArea" style="display:none">
+      <div class="input-row">
+        <textarea id="msgInput" placeholder="输入消息，Enter发送，Shift+Enter换行..." rows="1"></textarea>
+        <button class="layui-btn layui-btn-primary" id="btnImage" onclick="sendImage()">图片</button>
+        <button class="layui-btn" id="btnSend" onclick="sendMessage()">发送</button>
+      </div>
+    </div>
+    <div class="empty-chat" id="emptyChat">请从左侧选择一个会话</div>
+  </div>
+</div>
+
+<input type="file" id="imageInput" accept="image/jpeg,image/png,image/gif" style="display:none" onchange="handleImageSelect(event)">
+
+<div class="transfer-mask" id="transferMask" onclick="closeTransferDialog()"></div>
+<div class="transfer-dialog" id="transferDialog">
+  <h3>转接会话</h3>
+  <div class="form-group">
+    <label>选择转接给</label>
+    <select id="transferTarget"><option value="">请选择在线管理员...</option></select>
+  </div>
+  <div class="form-group">
+    <label>转接备注（可选）</label>
+    <textarea id="transferNote" placeholder="填写转接原因或说明..."></textarea>
+  </div>
+  <div class="btn-row">
+    <button class="layui-btn layui-btn-primary" onclick="closeTransferDialog()">取消</button>
+    <button class="layui-btn" onclick="confirmTransfer()">确认转接</button>
+  </div>
+</div>
+
+<div class="notify-popup" id="notifyPopup">
+  <div class="np-header">
+    <span>有新的转接请求</span>
+    <span class="np-close" onclick="closeNotifyPopup()">&times;</span>
+  </div>
+  <div class="np-body" id="notifyBody"></div>
+</div>
+
+<div class="declined-popup" id="declinedPopup">
+  <div class="dp-title" id="declinedTitle"></div>
+  <div class="dp-desc" id="declinedDesc"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+var currentSessionId = 0;
+var currentTab = 'assigned';
+var lastMsgId = 0;
+var pollTimer = null;
+var notifyPollTimer = null;
+var heartbeatTimer = null;
+var sessionIds = [];
+
+// 从URL获取预设session_id
+var urlParams = new URLSearchParams(window.location.search);
+var presetSessionId = urlParams.get('id') || 0;
+
+// ========== Tab切换 ==========
+document.querySelectorAll('.sidebar-tabs .tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.sidebar-tabs .tab').forEach(function(t) { t.classList.remove('active'); });
+    this.classList.add('active');
+    currentTab = this.dataset.tab;
+    loadSessionList();
+  });
+});
+
+// ========== 加载会话列表 ==========
+function loadSessionList() {
+  fetch('/index/adminChatListData?tab=' + currentTab + '&page=1', {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    var list = (res && res.data && res.data.list) ? res.data.list : [];
+    sessionIds = list.map(function(s) { return s.id; });
+    renderSessionList(list);
+    // 如果有预设session_id，自动选中
+    if (presetSessionId && !currentSessionId) {
+      selectSession(presetSessionId);
+      presetSessionId = 0;
+    }
+  })
+  .catch(function(e) { console.error('loadSessionList error:', e); });
+}
+
+function renderSessionList(list) {
+  var html = '';
+  if (list.length === 0) {
+    html = '<div class="msg-empty">暂无会话</div>';
+  } else {
+    list.forEach(function(s) {
+      var activeCls = (s.id == currentSessionId) ? ' active' : '';
+      var badge = (s.admin_unread > 0) ? '<span class="si-badge">' + s.admin_unread + '</span>' : '';
+      var tag = '';
+      if (!s.assigned_admin_id) {
+        tag = '<span class="si-tag si-tag-unassigned">待认领</span>';
+      } else if (s.transfer_status == 1) {
+        tag = '<span class="si-tag si-tag-transfer">转接中</span>';
+      } else if (s.assigned_admin_name) {
+        tag = '<span class="si-tag si-tag-assigned">' + s.assigned_admin_name + '</span>';
+      }
+      var preview = s.last_message_preview || '(暂无消息)';
+      if (preview.length > 30) preview = preview.substring(0, 30) + '...';
+      var time = s.last_message_at ? formatTime(s.last_message_at) : formatTime(s.created_at);
+      html += '<div class="session-item' + activeCls + '" onclick="selectSession(' + s.id + ')">' +
+        '<div class="si-top"><span class="si-name">' + escapeHtml(s.username || ('用户'+s.user_id)) + badge + '</span><span class="si-time">' + time + '</span></div>' +
+        '<div class="si-preview">' + escapeHtml(preview) + tag + '</div>' +
+        '</div>';
+    });
+  }
+  document.getElementById('sessionList').innerHTML = html;
+}
+
+// ========== 选择会话 ==========
+function selectSession(sessionId) {
+  currentSessionId = sessionId;
+  lastMsgId = 0;
+  document.querySelectorAll('.session-item').forEach(function(el) { el.classList.remove('active'); });
+  // 标记选中
+  fetch('/index/adminChatListData?tab=' + currentTab + '&page=1', {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    var list = (res && res.data && res.data.list) ? res.data.list : [];
+    renderSessionList(list);
+    loadMessages(true);
+  });
+
+  document.getElementById('chatHeader').style.display = 'flex';
+  document.getElementById('inputArea').style.display = 'block';
+  document.getElementById('emptyChat').style.display = 'none';
+
+  // 开始轮询
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(function() {
+    if (currentSessionId) loadMessages(false);
+  }, 2000);
+}
+
+// ========== 加载消息 ==========
+function loadMessages(isFirst) {
+  if (!currentSessionId) return;
+  var url = '/index/adminChatDetailData?session_id=' + currentSessionId + '&after_id=' + (isFirst ? 0 : lastMsgId);
+  fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.code !== 0) return;
+    var data = res.data;
+    var messages = data.messages || [];
+    var session = data.session || {};
+
+    // 更新header
+    document.getElementById('chatUserName').textContent = session.username || ('用户' + session.user_id);
+    var statusText = '';
+    if (session.status == 0) statusText = '(已关闭)';
+    else if (session.assigned_admin_name) statusText = '接待: ' + session.assigned_admin_name;
+    else statusText = '待认领';
+    document.getElementById('chatUserStatus').textContent = statusText;
+
+    // 转接信息
+    if (data.transfer) {
+      showTransferNotify(data.transfer.from_name, data.transfer.note, currentSessionId);
+    }
+
+    if (messages.length > 0 || isFirst) {
+      if (isFirst) {
+        renderMessages(messages, true);
+        if (messages.length > 0) lastMsgId = messages[messages.length - 1].id;
+      } else {
+        renderMessages(messages, false);
+        if (messages.length > 0) lastMsgId = messages[messages.length - 1].id;
+      }
+    }
+
+    // 如果会话已关闭，禁用输入
+    if (session.status == 0) {
+      document.getElementById('msgInput').disabled = true;
+      document.getElementById('btnSend').disabled = true;
+      document.getElementById('btnImage').disabled = true;
+      document.getElementById('btnTransfer').style.display = 'none';
+    } else {
+      document.getElementById('msgInput').disabled = false;
+      document.getElementById('btnSend').disabled = false;
+      document.getElementById('btnImage').disabled = false;
+      document.getElementById('btnTransfer').style.display = '';
+    }
+  })
+  .catch(function(e) { console.error('loadMessages error:', e); });
+}
+
+function renderMessages(messages, clear) {
+  var area = document.getElementById('msgArea');
+  if (clear) area.innerHTML = '';
+  if (messages.length === 0 && clear) {
+    area.innerHTML = '<div class="msg-empty">暂无消息，开始对话吧</div>';
+    return;
+  }
+  if (clear && area.querySelector('.msg-empty')) area.innerHTML = '';
+
+  messages.forEach(function(msg) {
+    var cls = 'msg-system';
+    var senderText = '';
+    if (msg.sender_type == 0) {
+      cls = 'msg-user';
+      senderText = msg.sender_name || '用户';
+    } else if (msg.sender_type == 1 && msg.sender_id > 0) {
+      cls = 'msg-admin';
+      senderText = msg.sender_name || '客服';
+    } else {
+      cls = 'msg-system';
+    }
+
+    var bubbleHtml = '';
+    if (msg.message_type == 1 && msg.image_full_url) {
+      bubbleHtml = '<img class="msg-image" src="' + msg.image_full_url + '" onclick="previewImage(\''+msg.image_full_url+'\')">';
+    } else {
+      bubbleHtml = escapeHtml(msg.content || '');
+    }
+
+    var senderHtml = (cls !== 'msg-system') ? '<div class="msg-sender">' + escapeHtml(senderText) + '</div>' : '';
+    var timeHtml = '<div class="msg-time">' + formatTime(msg.created_at) + '</div>';
+
+    var itemHtml = '<div class="msg-item ' + cls + '">' + senderHtml +
+      '<div class="msg-bubble">' + bubbleHtml + '</div>' + timeHtml + '</div>';
+    area.insertAdjacentHTML('beforeend', itemHtml);
+  });
+
+  // 滚动到底部
+  area.scrollTop = area.scrollHeight;
+}
+
+// ========== 发送消息 ==========
+function sendMessage() {
+  var input = document.getElementById('msgInput');
+  var content = input.value.trim();
+  if (!content || !currentSessionId) return;
+
+  input.value = '';
+  input.style.height = '40px';
+
+  fetch('/index/adminChatSend', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    body: JSON.stringify({ session_id: currentSessionId, content: content })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.code !== 0) {
+      layui.layer.msg(res.msg || '发送失败', { icon: 2 });
+      input.value = content;
+    } else {
+      loadMessages(false);
+    }
+  })
+  .catch(function(e) {
+    layui.layer.msg('网络错误', { icon: 2 });
+    input.value = content;
+  });
+}
+
+// ========== 发送图片 ==========
+function sendImage() {
+  document.getElementById('imageInput').click();
+}
+
+function handleImageSelect(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 3 * 1024 * 1024) {
+    layui.layer.msg('图片不能超过3MB', { icon: 2 });
+    event.target.value = '';
+    return;
+  }
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var base64 = e.target.result;
+    fetch('/index/adminChatUploadImage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ session_id: currentSessionId, image: base64 })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      if (res.code !== 0) {
+        layui.layer.msg(res.msg || '图片发送失败', { icon: 2 });
+      } else {
+        loadMessages(false);
+      }
+    })
+    .catch(function(e) { layui.layer.msg('网络错误', { icon: 2 }); });
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+// ========== 关闭会话 ==========
+function closeSession() {
+  if (!currentSessionId) return;
+  layui.layer.confirm('确定关闭此会话？', { title: '确认' }, function(index) {
+    fetch('/index/adminChatClose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ session_id: currentSessionId })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      if (res.code === 0) {
+        layui.layer.msg('会话已关闭', { icon: 1 });
+        loadMessages(true);
+        loadSessionList();
+      } else {
+        layui.layer.msg(res.msg || '操作失败', { icon: 2 });
+      }
+    })
+    .catch(function(e) { layui.layer.msg('网络错误', { icon: 2 }); });
+    layui.layer.close(index);
+  });
+}
+
+// ========== 转接功能 ==========
+function openTransferDialog() {
+  if (!currentSessionId) return;
+  document.getElementById('transferMask').style.display = 'block';
+  document.getElementById('transferDialog').style.display = 'block';
+  document.getElementById('transferNote').value = '';
+
+  // 加载在线管理员
+  fetch('/index/adminChatOnlineAdmins', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    var select = document.getElementById('transferTarget');
+    select.innerHTML = '<option value="">请选择在线管理员...</option>';
+    if (res.code === 0 && res.data.online_admins) {
+      res.data.online_admins.forEach(function(a) {
+        select.innerHTML += '<option value="' + a.id + '">' + a.name + '</option>';
+      });
+      if (res.data.online_admins.length === 0) {
+        select.innerHTML = '<option value="">当前没有其他在线管理员</option>';
+      }
+    }
+  })
+  .catch(function(e) {
+    document.getElementById('transferTarget').innerHTML = '<option value="">加载失败</option>';
+  });
+}
+
+function closeTransferDialog() {
+  document.getElementById('transferMask').style.display = 'none';
+  document.getElementById('transferDialog').style.display = 'none';
+}
+
+function confirmTransfer() {
+  var targetId = document.getElementById('transferTarget').value;
+  var note = document.getElementById('transferNote').value.trim();
+  if (!targetId) {
+    layui.layer.msg('请选择转接目标', { icon: 2 });
+    return;
+  }
+
+  fetch('/index/adminChatTransfer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    body: JSON.stringify({ session_id: currentSessionId, to_admin_id: parseInt(targetId), note: note })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.code === 0) {
+      var msg = res.msg;
+      if (res.data && res.data.target_online === false) {
+        msg += '（注意：目标管理员当前不在线，可能无法及时收到通知）';
+      }
+      layui.layer.msg(msg, { icon: 1 });
+      closeTransferDialog();
+      loadMessages(true);
+      loadSessionList();
+    } else {
+      layui.layer.msg(res.msg || '转接失败', { icon: 2 });
+    }
+  })
+  .catch(function(e) { layui.layer.msg('网络错误', { icon: 2 }); });
+}
+
+// ========== 转接通知 ==========
+function showTransferNotify(fromName, note, sessionId) {
+  var body = document.getElementById('notifyBody');
+  body.innerHTML = '<div class="np-title">客服 ' + escapeHtml(fromName) + ' 向您转接了一个会话</div>' +
+    (note ? '<div class="np-desc">备注：' + escapeHtml(note) + '</div>' : '<div class="np-desc">无备注</div>') +
+    '<div class="np-actions">' +
+    '<button class="layui-btn layui-btn-primary" onclick="declineTransfer(' + sessionId + ')">拒绝</button>' +
+    '<button class="layui-btn" onclick="acceptTransfer(' + sessionId + ')">接受</button>' +
+    '</div>';
+  document.getElementById('notifyPopup').style.display = 'block';
+}
+
+function closeNotifyPopup() {
+  document.getElementById('notifyPopup').style.display = 'none';
+}
+
+function acceptTransfer(sessionId) {
+  fetch('/index/adminChatAcceptTransfer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    body: JSON.stringify({ session_id: sessionId })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.code === 0) {
+      layui.layer.msg('已接受转接', { icon: 1 });
+      closeNotifyPopup();
+      currentTab = 'assigned';
+      document.querySelectorAll('.sidebar-tabs .tab').forEach(function(t) { t.classList.remove('active'); });
+      document.querySelector('.sidebar-tabs .tab[data-tab="assigned"]').classList.add('active');
+      selectSession(sessionId);
+      loadSessionList();
+    } else {
+      layui.layer.msg(res.msg || '操作失败', { icon: 2 });
+    }
+  })
+  .catch(function(e) { layui.layer.msg('网络错误', { icon: 2 }); });
+}
+
+function declineTransfer(sessionId) {
+  fetch('/index/adminChatDeclineTransfer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    body: JSON.stringify({ session_id: sessionId })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.code === 0) {
+      layui.layer.msg('已拒绝转接', { icon: 1 });
+      closeNotifyPopup();
+    } else {
+      layui.layer.msg(res.msg || '操作失败', { icon: 2 });
+    }
+  })
+  .catch(function(e) { layui.layer.msg('网络错误', { icon: 2 }); });
+}
+
+// ========== 轮询通知 ==========
+function pollNotifications() {
+  fetch('/index/adminChatPoll', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.code !== 0) return;
+    var data = res.data;
+
+    // 待认领数量
+    var badgeUnassigned = document.getElementById('badge-unassigned');
+    if (data.unassigned_count > 0) {
+      badgeUnassigned.textContent = data.unassigned_count;
+      badgeUnassigned.style.display = 'inline-block';
+    } else {
+      badgeUnassigned.style.display = 'none';
+    }
+
+    // 转接给我
+    var badgeTransfer = document.getElementById('badge-transfer');
+    if (data.transfers && data.transfers.length > 0) {
+      badgeTransfer.textContent = data.transfers.length;
+      badgeTransfer.style.display = 'inline-block';
+      // 显示第一个转接通知
+      if (document.getElementById('notifyPopup').style.display !== 'block') {
+        var t = data.transfers[0];
+        showTransferNotify(t.transfer_from_name, t.transfer_note, t.id);
+      }
+    } else {
+      badgeTransfer.style.display = 'none';
+    }
+
+    // 被拒绝的转接
+    if (data.declined_transfers && data.declined_transfers.length > 0) {
+      data.declined_transfers.forEach(function(dt) {
+        showDeclinedNotify(dt.transfer_to_name, dt.username);
+      });
+    }
+
+    // 刷新会话列表（如果有未读变化）
+    loadSessionList();
+  })
+  .catch(function(e) {});
+}
+
+function showDeclinedNotify(targetName, userName) {
+  document.getElementById('declinedTitle').textContent = '转接被拒绝';
+  document.getElementById('declinedDesc').textContent = targetName + ' 拒绝了您转接的会话（用户：' + userName + '）';
+  document.getElementById('declinedPopup').style.display = 'block';
+  setTimeout(function() {
+    document.getElementById('declinedPopup').style.display = 'none';
+  }, 8000);
+}
+
+// ========== 心跳 ==========
+function heartbeat() {
+  fetch('/index/adminChatHeartbeat', {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  }).catch(function(e) {});
+}
+
+// ========== 工具函数 ==========
+function escapeHtml(text) {
+  if (!text) return '';
+  var div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function formatTime(timeStr) {
+  if (!timeStr) return '';
+  var d = new Date(timeStr.replace(/-/g, '/'));
+  var now = new Date();
+  var hh = String(d.getHours()).padStart(2, '0');
+  var mm = String(d.getMinutes()).padStart(2, '0');
+  if (d.toDateString() === now.toDateString()) {
+    return hh + ':' + mm;
+  }
+  var mo = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  return mo + '-' + dd + ' ' + hh + ':' + mm;
+}
+
+function previewImage(url) {
+  layui.layer.photos({
+    photos: { data: [{ src: url }] },
+    anim: 5
+  });
+}
+
+// ========== 输入框事件 ==========
+document.getElementById('msgInput').addEventListener('keydown', function(e) {
+  if (e.keyCode === 13 && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+document.getElementById('msgInput').addEventListener('input', function() {
+  this.style.height = '40px';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+// ========== 初始化 ==========
+loadSessionList();
+pollNotifications();
+heartbeat();
+
+setInterval(pollNotifications, 5000);
+setInterval(heartbeat, 30000);
+
+// 页面可见性变化
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  } else {
+    if (currentSessionId && !pollTimer) {
+      loadMessages(false);
+      pollTimer = setInterval(function() {
+        if (currentSessionId) loadMessages(false);
+      }, 2000);
+    }
+    heartbeat();
+  }
+});
+</script>
+</body>
+</html>

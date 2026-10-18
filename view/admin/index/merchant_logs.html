@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>请求记录</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+.search-bar { margin-bottom: 15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.search-bar .layui-input { height:38px; }
+.stat-row { display:flex; gap:15px; margin-bottom:15px; flex-wrap:wrap; }
+.stat-card { background:#fff; padding:15px 20px; border-radius:8px; min-width:150px; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+.stat-card .num { font-size:24px; font-weight:bold; }
+.stat-card .label { color:#888; font-size:13px; margin-top:4px; }
+.stat-card.success .num { color:#009688; }
+.stat-card.fail .num { color:#FF5722; }
+.stat-card.total .num { color:#1E9FFF; }
+.stat-card.today .num { color:#FFB800; }
+.detail-box { max-height:400px; overflow:auto; background:#1e1e1e; color:#d4d4d4; padding:15px; border-radius:6px; font-family:Consolas,Monaco,monospace; font-size:13px; line-height:1.6; white-space:pre-wrap; word-break:break-all; }
+</style>
+</head>
+<body style="padding:20px;background:#f5f6fa">
+<div style="background:#fff;padding:20px;border-radius:8px">
+<h3 style="margin-bottom:15px">商户API请求记录</h3>
+
+<div class="stat-row" id="statsRow">
+  <div class="stat-card total"><div class="num" id="statTotal">-</div><div class="label">总请求数</div></div>
+  <div class="stat-card success"><div class="num" id="statSuccess">-</div><div class="label">成功(2xx)</div></div>
+  <div class="stat-card fail"><div class="num" id="statFail">-</div><div class="label">失败(4xx/5xx)</div></div>
+  <div class="stat-card today"><div class="num" id="statToday">-</div><div class="label">今日请求</div></div>
+</div>
+
+<div class="search-bar">
+  <input type="text" id="searchMerchant" placeholder="商户名称" class="layui-input" style="width:150px">
+  <select id="searchPath" class="layui-select" style="width:180px;height:38px;padding:0 10px;border:1px solid #eee;border-radius:2px">
+    <option value="">全部接口</option>
+    <option value="/merchant/pay">支付请求</option>
+    <option value="/merchant/query">查询请求</option>
+    <option value="/merchant/refund">退款请求</option>
+  </select>
+  <select id="searchCode" class="layui-select" style="width:120px;height:38px;padding:0 10px;border:1px solid #eee;border-radius:2px">
+    <option value="">全部状态</option>
+    <option value="200">200 成功</option>
+    <option value="400">400 参数错误</option>
+    <option value="401">401 认证失败</option>
+    <option value="403">403 权限拒绝</option>
+    <option value="500">500 服务器错误</option>
+  </select>
+  <input type="text" id="searchIP" placeholder="客户端IP" class="layui-input" style="width:140px">
+  <button class="layui-btn" id="btnSearch">搜索</button>
+  <button class="layui-btn layui-btn-primary" id="btnReset">重置</button>
+  <button class="layui-btn layui-btn-danger" id="btnBatchDel">批量删除</button>
+</div>
+
+<table class="layui-table" id="logTable"></table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+layui.use(['table','layer','form'], function(){
+  var table = layui.table;
+  var layer = layui.layer;
+  var $ = layui.$;
+
+  function getToken(){ return localStorage.getItem('admin_token') || ''; }
+
+  function getParams(){
+    return {
+      merchant: $('#searchMerchant').val() || '',
+      path: $('#searchPath').val() || '',
+      code: $('#searchCode').val() || '',
+      ip: $('#searchIP').val() || ''
+    };
+  }
+
+  // 统计
+  function loadStats(){
+    fetch('/index/adminMerchantLogsData?stats=1', {
+      headers: {'Authorization': 'Bearer ' + getToken()}
+    }).then(function(r){return r.json()}).then(function(r){
+      if(r.code===0 && r.data){
+        $('#statTotal').text(r.data.total || 0);
+        $('#statSuccess').text(r.data.success || 0);
+        $('#statFail').text(r.data.fail || 0);
+        $('#statToday').text(r.data.today || 0);
+      }
+    }).catch(function(){});
+  }
+  loadStats();
+
+  table.render({
+    elem: '#logTable',
+    id: 'logTable',
+    url: '/index/adminMerchantLogsData',
+    headers: {'Authorization': 'Bearer ' + getToken()},
+    where: getParams(),
+    parseData: function(r){
+      return {code: r.code===0?0:1, data: r.data.list||[], count: r.data.total||0}
+    },
+    page: true,
+    limit: 15,
+    limits: [15, 30, 50, 100],
+    cols: [[
+      {type:'checkbox', width:45},
+      {field:'id', title:'ID', width:70, sort:true},
+      {field:'merchant_name', title:'商户名称', width:140, templet:function(d){
+        return d.merchant_name || '<span style="color:#999">未识别</span>';
+      }},
+      {field:'api_key', title:'API Key', width:180, templet:function(d){
+        if(!d.api_key) return '<span style="color:#999">-</span>';
+        var k = d.api_key;
+        return k.substring(0,8) + '****' + k.substring(k.length-4);
+      }},
+      {field:'nonce', title:'Nonce', width:150},
+      {field:'request_method', title:'方法', width:70},
+      {field:'request_path', title:'接口路径', minWidth:140},
+      {field:'response_code', title:'状态码', width:90, templet:function(d){
+        var c = d.response_code;
+        if(c >= 200 && c < 300) return '<span style="color:#009688;font-weight:bold">'+c+'</span>';
+        if(c >= 400 && c < 500) return '<span style="color:#FFB800;font-weight:bold">'+c+'</span>';
+        if(c >= 500) return '<span style="color:#FF5722;font-weight:bold">'+c+'</span>';
+        return '<span>'+c+'</span>';
+      }},
+      {field:'client_ip', title:'客户端IP', width:130},
+      {field:'created_at', title:'请求时间', width:170, sort:true},
+      {title:'操作', width:150, toolbar:'#actionBar'}
+    ]]
+  });
+
+  table.on('tool(logTable)', function(obj){
+    var data = obj.data;
+    if(obj.event === 'detail'){
+      var reqData = data.request_data || '';
+      var respData = data.response_data || '';
+      try { reqData = JSON.stringify(JSON.parse(reqData), null, 2); } catch(e) {}
+      try { respData = JSON.stringify(JSON.parse(respData), null, 2); } catch(e) {}
+
+      var html = '<div style="padding:10px">'
+        + '<div style="margin-bottom:5px;font-weight:bold;color:#333">认证信息</div>'
+        + '<div style="margin-bottom:3px;font-size:12px;color:#888">商户: '+(data.merchant_name||'未识别')+' &nbsp;|&nbsp; IP: '+(data.client_ip||'-')+'</div>'
+        + '<div style="margin-bottom:3px;font-size:12px;color:#888">API Key: '+(data.api_key||'-')+'</div>'
+        + '<div style="margin-bottom:3px;font-size:12px;color:#888">Timestamp: '+(data.req_timestamp||'-')+'</div>'
+        + '<div style="margin-bottom:3px;font-size:12px;color:#888">Nonce: '+(data.nonce||'-')+'</div>'
+        + '<div style="margin:5px 0 3px;font-size:12px;color:#888">Signature:</div>'
+        + '<div class="detail-box" style="max-height:80px">'+(data.signature||'-')+'</div>'
+        + '<div style="margin:15px 0 5px;font-weight:bold;color:#333">请求信息</div>'
+        + '<div style="margin-bottom:3px;font-size:12px;color:#888">'+(data.request_method||'')+' '+(data.request_path||'')+'</div>'
+        + '<div style="margin:8px 0 3px;font-size:12px;color:#888;font-weight:bold">请求数据:</div>'
+        + '<div class="detail-box">'+(reqData||'(空)')+'</div>'
+        + '<div style="margin:12px 0 3px;font-size:12px;color:#888;font-weight:bold">响应数据 (HTTP '+data.response_code+'):</div>'
+        + '<div class="detail-box">'+(respData||'(空)')+'</div>'
+        + '<div style="margin:10px 0 3px;font-size:12px;color:#888;font-weight:bold">User-Agent:</div>'
+        + '<div style="font-size:12px;color:#666;word-break:break-all">'+(data.user_agent||'-')+'</div>'
+        + '</div>';
+
+      layer.open({
+        type: 1,
+        title: '请求详情 #'+data.id,
+        area: ['90%','80%'],
+        content: html
+      });
+    } else if(obj.event === 'delete'){
+      layer.confirm('确定删除该条请求记录吗？<br><span style="color:#FF5722;font-size:12px">删除后不可恢复，仅清理日志记录，不影响任何业务数据。</span>', {
+        title: '删除确认', icon: 3, btn: ['确定删除', '取消']
+      }, function(idx){
+        layer.close(idx);
+        fetch('/index/adminMerchantLogDelete', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken()},
+          body: JSON.stringify({id: data.id})
+        }).then(function(r){return r.json()}).then(function(r){
+          if(r.code === 0){
+            layer.msg(r.msg || '删除成功', {icon: 1});
+            obj.del();
+            loadStats();
+          } else {
+            layer.msg(r.msg || '演示系统，需要保留演示数据！',);
+          }
+        }).catch(function(){
+          layer.msg('演示系统无删除权限',);
+        });
+      });
+    }
+  });
+
+  // 批量删除
+  $('#btnBatchDel').on('click', function(){
+    var checkStatus = table.checkStatus('logTable');
+    var rows = checkStatus.data || [];
+    if(!rows.length){
+      layer.msg('请先勾选要删除的记录', {icon: 2});
+      return;
+    }
+    layer.confirm('确定删除选中的 <b style="color:#FF5722">'+rows.length+'</b> 条请求记录吗？<br><span style="color:#FF5722;font-size:12px">删除后不可恢复，仅清理日志记录，不影响任何业务数据。</span>', {
+      title: '批量删除确认', icon: 3, btn: ['确定删除', '取消']
+    }, function(idx){
+      layer.close(idx);
+      var ids = [];
+      for(var i=0;i<rows.length;i++){ ids.push(rows[i].id); }
+      fetch('/index/adminMerchantLogBatchDelete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken()},
+        body: JSON.stringify({ids: ids})
+      }).then(function(r){return r.json()}).then(function(r){
+        if(r.code === 0){
+          layer.msg(r.msg || '删除成功', {icon: 1});
+          table.reload('logTable', {where: getParams()});
+          loadStats();
+        } else {
+          layer.msg(r.msg || '演示系统，需要保留演示数据', );
+        }
+      }).catch(function(){
+        layer.msg('演示系统，禁止删除数据', );
+      });
+    });
+  });
+
+  $('#btnSearch').on('click', function(){
+    table.reload('logTable', {where: getParams(), page: {curr:1}});
+    loadStats();
+  });
+
+  $('#btnReset').on('click', function(){
+    $('#searchMerchant').val('');
+    $('#searchPath').val('');
+    $('#searchCode').val('');
+    $('#searchIP').val('');
+    table.reload('logTable', {where: {}, page: {curr:1}});
+    loadStats();
+  });
+});
+</script>
+
+<script type="text/html" id="actionBar">
+  <button class="layui-btn layui-btn-sm" lay-event="detail">详情</button>
+  <button class="layui-btn layui-btn-sm layui-btn-danger" lay-event="delete">删除</button>
+</script>
+</body>
+</html>

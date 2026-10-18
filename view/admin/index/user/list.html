@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理 - 积分管理系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@3.1.1/dist/css/layui.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; }
+        .content-card {
+            background: #fff; border-radius: 6px; padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .search-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+        .search-bar .layui-input { width: 200px; height: 36px; }
+        .search-bar .layui-select { width: 140px; height: 36px; }
+    </style>
+</head>
+<body>
+    <div class="content-card">
+        <div class="search-bar">
+            <input type="text" id="searchKeyword" placeholder="搜索用户名/手机号" class="layui-input">
+            <select id="searchStatus" class="layui-input" style="width:140px;">
+                <option value="">全部状态</option>
+                <option value="1">正常</option>
+                <option value="0">禁用</option>
+            </select>
+            <button class="layui-btn" id="btnSearch" style="background:#2979FF;height:36px;line-height:36px;">
+                <i class="layui-icon layui-icon-search"></i> 搜索
+            </button>
+        </div>
+        <table id="userTable" lay-filter="userTable"></table>
+    </div>
+
+    <script type="text/html" id="userStatusTpl">
+        {{# if(d.status === 1) { }}
+            <span class="layui-badge layui-bg-green">正常</span>
+        {{# } else { }}
+            <span class="layui-badge">禁用</span>
+        {{# } }}
+    </script>
+
+    <script type="text/html" id="userRealnameTpl">
+        {{# if(d.real_name_verified === 1) { }}
+            <span class="layui-badge layui-bg-blue">已实名</span>
+        {{# } else { }}
+            <span class="layui-badge layui-bg-gray">未实名</span>
+        {{# } }}
+    </script>
+
+    <script type="text/html" id="userMerchantTpl">
+        {{# if(d.merchant_verified === 1) { }}
+            <span class="layui-badge layui-bg-blue">已认证</span>
+        {{# } else { }}
+            <span class="layui-badge layui-bg-gray">未认证</span>
+        {{# } }}
+    </script>
+
+    <script type="text/html" id="userBar">
+        <a class="layui-btn layui-btn-xs" lay-event="detail">详情</a>
+        {{# if(d.status === 1) { }}
+            <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="disable">禁用</a>
+        {{# } else { }}
+            <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="enable">启用</a>
+        {{# } }}
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/layui@3.1.1/dist/layui.js"></script>
+    <script>
+        var __apiToken = '';
+        window.addEventListener('message', function(e) { if (e.data && e.data.type === 'setToken') __apiToken = e.data.token; });
+
+        layui.use(['table', 'layer'], function() {
+            var table = layui.table;
+            var layer = layui.layer;
+            var $ = layui.$;
+            // 渲染表格
+            table.render({
+                elem: '#userTable',
+                url: '/admin/users',
+                headers: { 'Authorization': 'Bearer ' + __apiToken },
+                where: {
+                    page: 1,
+                    page_size: 20
+                },
+                parseData: function(res) {
+                    return {
+                        code: res.code === 0 ? 0 : res.code,
+                        msg: res.msg,
+                        count: res.data ? res.data.total : 0,
+                        data: res.data ? res.data.list : []
+                    };
+                },
+                page: true,
+                limit: 20,
+                limits: [10, 20, 50],
+                cols: [[
+                    {field: 'id', title: 'ID', width: 80, sort: true},
+                    {field: 'username', title: '用户名', width: 150},
+                    {field: 'phone', title: '手机号', width: 140},
+                    {field: 'principal', title: '本金余额', width: 120, templet: function(d){ return parseFloat(d.principal||0).toFixed(2); }},
+                    {field: 'bonus', title: '奖励余额', width: 120, templet: function(d){ return parseFloat(d.bonus||0).toFixed(2); }},
+                    {field: 'real_name_verified', title: '实名', width: 100, templet: '#userRealnameTpl'},
+                    {field: 'merchant_verified', title: '商户', width: 100, templet: '#userMerchantTpl'},
+                    {field: 'status', title: '状态', width: 90, templet: '#userStatusTpl'},
+                    {field: 'created_at', title: '注册时间', width: 170},
+                    {title: '操作', width: 150, toolbar: '#userBar', fixed: 'right'}
+                ]]
+            });
+
+            // 搜索
+            $('#btnSearch').on('click', function() {
+                table.reload('userTable', {
+                    where: {
+                        keyword: $('#searchKeyword').val(),
+                        status: $('#searchStatus').val()
+                    },
+                    page: { curr: 1 }
+                });
+            });
+
+            // 工具条事件
+            table.on('tool(userTable)', function(obj) {
+                var data = obj.data;
+                if (obj.event === 'detail') {
+                    // 在iframe中打开详情页
+                    window.parent.postMessage({
+                        type: 'navigate',
+                        url: '/admin/view/users/' + data.id,
+                        title: '用户详情'
+                    }, '*');
+                } else if (obj.event === 'disable') {
+                    layer.confirm('确定要禁用用户 "' + data.username + '" 吗？', function(index) {
+                        $.ajax({
+                            url: '/admin/users/' + data.id + '/disable',
+                            type: 'POST',
+                            headers: { 'Authorization': 'Bearer ' + token },
+                            success: function(res) {
+                                if (res.code === 0) {
+                                    layer.msg('已禁用', {icon: 1});
+                                    table.reload('userTable');
+                                } else {
+                                    layer.msg(res.msg, {icon: 2});
+                                }
+                            }
+                        });
+                        layer.close(index);
+                    });
+                } else if (obj.event === 'enable') {
+                    $.ajax({
+                        url: '/admin/users/' + data.id + '/enable',
+                        type: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + token },
+                        success: function(res) {
+                            if (res.code === 0) {
+                                layer.msg('已启用', {icon: 1});
+                                table.reload('userTable');
+                            } else {
+                                layer.msg(res.msg, {icon: 2});
+                            }
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

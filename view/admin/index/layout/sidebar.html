@@ -1,0 +1,44 @@
+<div class="admin-sidebar">
+    <div class="logo">
+        <i class="layui-icon layui-icon-diamond"></i>
+        积分管理系统
+    </div>
+    <ul class="layui-nav layui-nav-tree" lay-filter="adminNav">
+        <li class="layui-nav-item layui-this" data-url="/admin/view/dashboard" data-title="仪表盘">
+            <a href="javascript:;"><i class="layui-icon layui-icon-home"></i> 仪表盘</a>
+        </li>
+        <li class="layui-nav-item" data-url="/admin/view/system/settings" data-title="系统设置">
+            <a href="javascript:;"><i class="layui-icon layui-icon-set"></i> 系统设置</a>
+        </li>
+        <li class="layui-nav-item" data-url="/admin/view/users" data-title="用户管理">
+            <a href="javascript:;"><i class="layui-icon layui-icon-user"></i> 用户管理</a>
+        </li>
+        <li class="layui-nav-item">
+            <a href="javascript:;"><i class="layui-icon layui-icon-ok-circle"></i> 认证审核</a>
+            <dl class="layui-nav-child">
+                <dd data-url="/admin/view/verify?type=realname" data-title="实名认证">
+                    <a href="javascript:;">实名认证</a>
+                </dd>
+                <dd data-url="/admin/view/verify?type=merchant" data-title="商户认证">
+                    <a href="javascript:;">商户认证</a>
+                </dd>
+            </dl>
+        </li>
+        <li class="layui-nav-item" data-url="/admin/view/merchants" data-title="商户管理">
+            <a href="javascript:;"><i class="layui-icon layui-icon-template-1"></i> 商户管理</a>
+        </li>
+        <li class="layui-nav-item" data-url="/admin/view/orders" data-title="订单管理">
+            <a href="javascript:;"><i class="layui-icon layui-icon-form"></i> 订单管理</a>
+        </li>
+        <li class="layui-nav-item" data-url="/admin/view/transactions" data-title="交易记录">
+            <a href="javascript:;"><i class="layui-icon layui-icon-rmb"></i> 交易记录</a>
+        </li>
+        
+        <li class="layui-nav-item" data-url="/admin/view/content" data-title="内容管理">
+    <a href="javascript:;"><i class="layui-icon layui-icon-note"></i> 内容管理</a>
+</li>
+
+        
+        
+    </ul>
+</div>

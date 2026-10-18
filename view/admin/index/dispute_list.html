@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>争议订单管理</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+.warn-banner { background:#FFF7E6; border:1px solid #FFD591; border-radius:6px; padding:12px 16px; margin-bottom:15px; color:#D46B08; font-size:13px; }
+</style>
+</head>
+<body style="padding:20px;background:#f5f6fa">
+<div style="background:#fff;padding:20px;border-radius:8px">
+<div class="warn-banner">
+  以下订单因买家已确认付款但卖家表示未收到款，已进入冻结状态。请核实后选择"完成交易"（积分付给买家）或"取消挂单"（恢复卖家挂单上架）。
+</div>
+<table class="layui-table" id="t" lay-filter="t"></table>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+layui.use(['table','layer'], function(){
+  var table = layui.table;
+  var layer = layui.layer;
+  var $ = layui.jquery;
+
+  table.render({
+    elem: '#t',
+    url: '/index/adminDisputeListData',
+    parseData: function(r){
+      return {
+        code: r.code === 0 ? 0 : 1,
+        data: r.data.list || [],
+        count: r.data.total || 0
+      };
+    },
+    page: true,
+    limit: 15,
+    cols: [[
+      {field:'id', title:'交易ID', width:80, sort:true},
+      {field:'order_no', title:'订单号', width:150},
+      {field:'buyer_name', title:'买家', width:110},
+      {field:'seller_name', title:'卖家', width:110},
+      {field:'points_amount', title:'积分', width:90},
+      {field:'total_price', title:'金额', width:100, templet: function(d){ return '￥' + (d.total_price || 0); }},
+      {field:'payment_method_text', title:'收款方式', width:100},
+      {field:'has_complaint', title:'投诉', width:70, templet: function(d){
+        return d.has_complaint ? '<span style="color:#FF5722">有</span>' : '<span style="color:#999">无</span>';
+      }},
+      {field:'created_at', title:'创建时间', width:170},
+      {title:'操作', width:200, fixed:'right', templet: function(d){
+        if(d.dispute_result){
+          if(d.dispute_result === 'complete'){
+            return '<span style="color:#52C41A;font-weight:600;">已处理-完成交易</span>';
+          } else {
+            return '<span style="color:#FA8C16;font-weight:600;">已处理-取消订单</span>';
+          }
+        }
+        var html = '';
+        html += '<button class="layui-btn layui-btn-xs" lay-event="complete">完成交易</button>';
+        html += '<button class="layui-btn layui-btn-xs layui-btn-warm" lay-event="cancel">取消挂单</button>';
+        return html;
+      }}
+    ]]
+  });
+
+  table.on('tool(t)', function(obj){
+    var data = obj.data;
+    if(obj.event === 'complete'){
+      layer.confirm('确认完成交易？积分将付给买家（用户' + data.buyer_name + '），交易完成。', function(index){
+        layer.close(index);
+        doResolve(data.id, 'complete');
+      });
+    } else if(obj.event === 'cancel'){
+      layer.confirm('确认取消挂单？订单将恢复上架，卖家可继续出售。', function(index){
+        layer.close(index);
+        doResolve(data.id, 'cancel');
+      });
+    }
+  });
+
+  function doResolve(transactionId, action){
+    var actionText = action === 'complete' ? '完成交易' : '取消挂单';
+    var loadIndex = layer.load(1);
+    $.ajax({
+      url: '/index/adminDisputeResolve',
+      type: 'POST',
+      data: { transaction_id: transactionId, action: action },
+      dataType: 'json',
+      success: function(res){
+        layer.close(loadIndex);
+        if(res && res.code === 0){
+          layer.msg(actionText + '成功', {icon:1, time:1500}, function(){
+            table.reload('t');
+          });
+        } else {
+          layer.msg(res && res.msg ? res.msg : '演示系统无法操作');
+        }
+      },
+      error: function(){
+        layer.close(loadIndex);
+        layer.msg('交易处理，演示系统不需要你处理！');
+      }
+    });
+  }
+});
+</script>
+</body>
+</html>

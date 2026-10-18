@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>积分宝 - 项目管理</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+body{padding:20px;background:#f5f6fa}
+.stat-row{display:flex;gap:15px;margin-bottom:15px;flex-wrap:wrap}
+.stat-card{background:#fff;padding:15px 20px;border-radius:8px;min-width:150px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+.stat-card .num{font-size:24px;font-weight:bold}
+.stat-card .label{color:#888;font-size:13px;margin-top:4px}
+.stat-card.c1 .num{color:#1E9FFF}.stat-card.c2 .num{color:#009688}
+.stat-card.c3 .num{color:#FFB800}.stat-card.c4 .num{color:#FF5722}.stat-card.c5 .num{color:#9C27B0}
+.filter-bar{background:#fff;padding:15px 20px;border-radius:8px;margin-bottom:15px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.filter-bar .layui-input{height:38px}
+.rules-box{background:#fff;padding:12px 20px;border-radius:8px;margin-bottom:15px;font-size:13px;display:flex;gap:25px;align-items:center;flex-wrap:wrap}
+.rules-box .layui-form-switch{margin-top:0}
+</style>
+</head>
+<body>
+<div class="stat-row">
+  <div class="stat-card c1"><div class="num" id="stTotal">-</div><div class="label">项目总数</div></div>
+  <div class="stat-card c2"><div class="num" id="stRunning">-</div><div class="label">进行中项目</div></div>
+  <div class="stat-card c3"><div class="num" id="stSold">-</div><div class="label">累计认购(积分)</div></div>
+  <div class="stat-card c4"><div class="num" id="stHolding">-</div><div class="label">当前持有中(积分)</div></div>
+  <div class="stat-card c5"><div class="num" id="stReward">-</div><div class="label">待发放奖励(积分)</div></div>
+</div>
+
+<div class="filter-bar">
+  <input type="text" id="fKeyword" placeholder="项目名称" class="layui-input" style="width:180px">
+  <select id="fStatus" style="width:140px;height:38px;padding:0 10px;border:1px solid #eee;border-radius:2px">
+    <option value="">全部状态</option>
+    <option value="0">草稿</option>
+    <option value="1">进行中</option>
+    <option value="2">已暂停</option>
+    <option value="3">已结束</option>
+    <option value="4">已关闭</option>
+  </select>
+  <button class="layui-btn" id="btnSearch">搜索</button>
+  <button class="layui-btn layui-btn-primary" id="btnReset">重置</button>
+  <button class="layui-btn layui-btn-normal" id="btnPublish" style="margin-left:auto">+ 发布新项目</button>
+</div>
+
+<table class="layui-table" id="projTable"></table>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+layui.use(['table','layer','form'], function(){
+  var table = layui.table, layer = layui.layer, form = layui.form, $ = layui.$;
+  function token(){ return localStorage.getItem('admin_token') || ''; }
+
+  function getParams(){
+    return {keyword: $('#fKeyword').val()||'', status: $('#fStatus').val()||''};
+  }
+  function loadStats(){
+    var p = new URLSearchParams(getParams()); p.set('stats','1');
+    fetch('/index/adminSavingsProjectListData?'+p.toString(), {headers:{'Authorization':'Bearer '+token()}})
+      .then(function(r){return r.json()}).then(function(r){
+        if(r.code===0 && r.data){
+          $('#stTotal').text(r.data.total||0);
+          $('#stRunning').text(r.data.running||0);
+          $('#stSold').text(r.data.total_sold||0);
+          $('#stHolding').text(r.data.holding_principal||0);
+          $('#stReward').text(r.data.pending_reward||0);
+        }
+      }).catch(function(){});
+  }
+  loadStats();
+
+  function statusText(s){
+    var m = {0:['草稿','gray'],1:['进行中','green'],2:['已暂停','orange'],3:['已结束','gray'],4:['已关闭','red']};
+    var t = m[s] || ['未知','gray'];
+    return '<span style="color:'+t[1]+';font-weight:bold">'+t[0]+'</span>';
+  }
+
+  table.render({
+    elem:'#projTable', id:'projTable',
+    url:'/index/adminSavingsProjectListData',
+    headers:{'Authorization':'Bearer '+token()},
+    where:getParams(),
+    parseData:function(r){ return {code:r.code===0?0:1, data:r.data.list||[], count:r.data.total||0}; },
+    page:true, limit:15, limits:[15,30,50],
+    cols:[[
+      {field:'id', title:'ID', width:60},
+      {field:'name', title:'项目名称', minWidth:100},
+      {field:'duration_days', title:'期限(天)', width:90},
+      {field:'reward_rate', title:'奖励率', width:90, templet:function(d){ return d.reward_rate+'%'; }},
+      {field:'total_quota', title:'总份额', width:110},
+      {field:'sold_quota', title:'已认购', width:140, templet:function(d){
+        var pct = d.total_quota>0 ? Math.min(100, d.sold_quota/d.total_quota*100).toFixed(1) : 0;
+        return d.sold_quota+' <span style="color:#999;font-size:12px">('+pct+'%)</span>';
+      }},
+      {field:'min_purchase', title:'最低认购', width:90},
+      {field:'max_purchase', title:'最高认购', width:90, templet:function(d){ return d.max_purchase>0?d.max_purchase:'不限'; }},
+      {field:'allow_early_redeem', title:'提前赎回', width:130, templet:function(d){
+        if(d.allow_early_redeem == 0){ return '<span style="color:#999">不允许</span>'; }
+        var r = parseFloat(d.early_redeem_deduct_rate)||0;
+        return r > 0
+          ? '<span style="color:#d9352b">允许·扣本金'+r+'%</span>'
+          : '<span style="color:#52c41a">允许·全额退本</span>';
+      }},
+      {field:'early_redeem_reward_policy', title:'赎回奖励', width:120, templet:function(d){
+        if(d.allow_early_redeem == 0){ return '<span style="color:#ccc">-</span>'; }
+        var p = parseInt(d.early_redeem_reward_policy)||0;
+        if(p === 2) return '<span style="color:#d9352b">全额发放</span>';
+        if(p === 1) return '<span style="color:#fa8c16">按天折算</span>';
+        return '<span style="color:#52c41a">不发放</span>';
+      }},
+      {field:'holding_count', title:'持有笔数', width:90},
+      {field:'settled_count', title:'已结笔数', width:90},
+      {field:'status', title:'状态', width:90, templet:function(d){ return statusText(d.status); }},
+      {field:'created_at', title:'创建时间', width:170},
+      {title:'操作', width:260, toolbar:'#projBar'}
+    ]]
+  });
+
+  table.on('tool(projTable)', function(obj){
+    var d = obj.data;
+    if(obj.event === 'edit'){
+      if(parent && parent.switchPage){ parent.switchPage('/index/adminSavingsProjectEdit?id='+d.id); }
+      else { location.href = '/index/adminSavingsProjectEdit?id='+d.id; }
+      return;
+    }
+    if(obj.event === 'pause' || obj.event === 'resume' || obj.event === 'close'){
+      var txt = {pause:'暂停后用户将无法新认购，持有中的订单不受影响', resume:'确定恢复该项目认购？', close:'关闭后用户无法新认购，已认购订单到期仍正常结算'}[obj.event];
+      layer.confirm(txt, {title:'操作确认', icon:3}, function(idx){
+        layer.close(idx);
+        fetch('/index/adminSavingsProjectStatus', {
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+token()},
+          body: JSON.stringify({id:d.id, action:obj.event})
+        }).then(function(r){return r.json()}).then(function(r){
+          layer.msg(r.msg, {icon:r.code===0?1:2});
+          if(r.code===0){ table.reload('projTable'); loadStats(); }
+        }).catch(function(){ layer.msg('演示系统不具备数据操作权限',{icon:2}); });
+      });
+    }
+  });
+
+  $('#btnSearch').on('click', function(){ table.reload('projTable',{where:getParams(),page:{curr:1}}); loadStats(); });
+  $('#btnReset').on('click', function(){ $('#fKeyword').val(''); $('#fStatus').val(''); table.reload('projTable',{where:{},page:{curr:1}}); loadStats(); });
+  $('#btnPublish').on('click', function(){
+    if(parent && parent.switchPage){ parent.switchPage('/index/adminSavingsProjectPublish'); }
+    else { location.href = '/index/adminSavingsProjectPublish'; }
+  });
+});
+</script>
+
+<script type="text/html" id="projBar">
+  <a class="layui-btn layui-btn-xs" lay-event="edit">设置</a>
+  {{# if(d.status===1){ }}
+  <a class="layui-btn layui-btn-xs layui-btn-warm" lay-event="pause">暂停</a>
+  {{# } }}
+  {{# if(d.status===2){ }}
+  <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="resume">恢复</a>
+  {{# } }}
+  {{# if(d.status===1 || d.status===2){ }}
+  <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="close">关闭</a>
+  {{# } }}
+</script>
+</body>
+</html>

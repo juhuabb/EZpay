@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>交易记录</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+.search-bar { margin-bottom: 15px; }
+.search-bar .layui-input-inline { margin-right: 10px; }
+</style>
+</head>
+<body style="padding:20px;background:#f5f6fa">
+<div style="background:#fff;padding:20px;border-radius:8px">
+<div class="search-bar">
+  <div class="layui-inline">
+    <select id="searchStatus" lay-filter="searchStatus">
+      <option value="">全部状态</option>
+      <option value="1">待付款</option>
+      <option value="2">交易中</option>
+      <option value="3">已完成</option>
+      <option value="4">未收到款</option>
+    </select>
+  </div>
+  <div class="layui-inline">
+    <input type="text" id="searchUserId" placeholder="用户ID搜索" class="layui-input" style="width:140px">
+  </div>
+  <div class="layui-inline">
+    <input type="text" id="searchOrderNo" placeholder="单号搜索" class="layui-input" style="width:180px">
+  </div>
+  <div class="layui-inline">
+    <input type="text" id="searchBuyerName" placeholder="买方名字" class="layui-input" style="width:130px">
+  </div>
+  <div class="layui-inline">
+    <input type="text" id="searchSellerName" placeholder="卖方名字" class="layui-input" style="width:130px">
+  </div>
+  <div class="layui-inline">
+    <button class="layui-btn" id="btnSearch">搜索</button>
+    <button class="layui-btn layui-btn-primary" id="btnReset">重置</button>
+  </div>
+</div>
+<table class="layui-table" id="t" lay-filter="t"></table>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+layui.use(['table','layer','form'], function(){
+  var table = layui.table;
+  var layer = layui.layer;
+  var $ = layui.jquery;
+  var token = localStorage.getItem('admin_token') || '';
+
+ var currentStatus = '';
+  var currentUserId = '';
+  var currentOrderNo = '';
+  var currentBuyerName = '';
+  var currentSellerName = '';
+
+  function reloadTable(){
+    table.reload('t', {
+      where: {
+        status: currentStatus,
+        user_id: currentUserId,
+        order_no: currentOrderNo,
+        buyer_name: currentBuyerName,
+        seller_name: currentSellerName
+      },
+      page: { curr: 1 }
+    });
+  }
+
+  table.render({
+    elem: '#t',
+    url: '/index/adminTransactionListData',
+    headers: { 'Authorization': 'Bearer ' + token },
+    where: { status: '', user_id: '', order_no: '', buyer_name: '', seller_name: '' },
+    parseData: function(r){
+      return {
+        code: r.code === 0 ? 0 : 1,
+        data: r.data.list || [],
+        count: r.data.total || 0
+      };
+    },
+    page: true,
+    limit: 15,
+    cols: [[
+      {field:'id', title:'ID', width:70, sort:true},
+      {field:'buyer_name', title:'买方', width:110},
+      {field:'seller_name', title:'卖方', width:110},
+      {field:'points_amount', title:'积分', width:90},
+      {field:'total_price', title:'金额', width:100, templet: function(d){ return '￥' + (d.total_price || 0); }},
+      {field:'order_no', title:'单号', width:160},
+      {field:'payment_method_text', title:'收款方式', width:100},
+      {field:'status_text', title:'状态', width:90},
+      {field:'delete_text', title:'删除标记', width:90, templet: function(d){
+        if(d.delete_text && d.delete_text !== '正常'){
+          return '<span style="color:#FF5722">' + d.delete_text + '</span>';
+        }
+        return '<span style="color:#009688">正常</span>';
+      }},
+      {field:'created_at', title:'创建时间', width:170},
+      {title:'操作', width:90, fixed:'right', templet: function(d){
+        return '<button class="layui-btn layui-btn-xs layui-btn-danger" lay-event="del">删除</button>';
+      }}
+    ]]
+  });
+
+  $('#btnSearch').on('click', function(){
+    currentStatus = $('#searchStatus').val() || '';
+    currentUserId = $('#searchUserId').val() || '';
+    currentOrderNo = $('#searchOrderNo').val() || '';
+    currentBuyerName = $('#searchBuyerName').val() || '';
+    currentSellerName = $('#searchSellerName').val() || '';
+    reloadTable();
+  });
+
+   $('#btnReset').on('click', function(){
+    $('#searchStatus').val('');
+    $('#searchUserId').val('');
+    $('#searchOrderNo').val('');
+    $('#searchBuyerName').val('');
+    $('#searchSellerName').val('');
+    currentStatus = '';
+    currentUserId = '';
+    currentOrderNo = '';
+    currentBuyerName = '';
+    currentSellerName = '';
+    reloadTable();
+  });
+
+  // 单条删除
+  table.on('tool(t)', function(obj){
+    if(obj.event === 'del'){
+      layer.confirm('确定要删除交易记录 #' + obj.data.id + ' 吗？此操作不可恢复！', function(index){
+        layer.close(index);
+        $.ajax({
+          url: '/index/adminTransactionDelete?id=' + obj.data.id,
+          type: 'GET',
+          headers: { 'Authorization': 'Bearer ' + token },
+          dataType: 'json',
+          success: function(res){
+            if(res && res.code === 0){
+              layer.msg('删除成功', {icon:1, time:1500}, function(){
+                reloadTable();
+              });
+            } else {
+              layer.msg((res && res.msg) ? res.msg : '删除失败', {icon:2, time:3000});
+            }
+          },
+          error: function(xhr){
+            var msg = '不要删除，你删除了其他人怎么看演示？';
+            try {
+              var res = JSON.parse(xhr.responseText);
+              if(res.msg) msg = res.msg;
+            } catch(e) {}
+            layer.msg(msg, {icon:2, time:3000});
+          }
+        });
+      });
+    }
+  });
+});
+</script>
+</body>
+</html>

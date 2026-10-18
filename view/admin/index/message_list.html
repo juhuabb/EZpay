@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>站内信管理</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+body { background: #f0f2f5; padding: 20px; margin: 0; }
+.card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.status-tag { padding: 2px 10px; border-radius: 4px; font-size: 12px; display: inline-block; }
+.status-read { background: #f6ffed; color: #52c41a; }
+.status-unread { background: #fff7e6; color: #fa8c16; }
+.pager { margin-top: 15px; text-align: center; }
+.pager button { margin: 0 5px; }
+.msg-content { max-width: 300px; word-break: break-all; }
+.type-tag { padding: 2px 8px; border-radius: 4px; font-size: 12px; display: inline-block; background: #e8e8e8; color: #666; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2 style="font-size:16px;margin:0 0 15px 0;">站内信管理</h2>
+  
+  <div style="margin-bottom:15px;">
+    <input type="text" id="keyword" placeholder="搜索标题/内容" style="width:200px;height:38px;border:1px solid #e6e6e6;border-radius:2px;padding:0 10px;">
+    <select id="typeFilter" style="width:130px;display:inline-block;height:38px;border:1px solid #e6e6e6;border-radius:2px;">
+      <option value="">全部类型</option>
+      <option value="trade">交易</option>
+      <option value="recharge">充值</option>
+      <option value="system">系统</option>
+      <option value="referral">推荐</option>
+    </select>
+    <select id="readFilter" style="width:130px;display:inline-block;height:38px;border:1px solid #e6e6e6;border-radius:2px;">
+      <option value="">全部状态</option>
+      <option value="0">未读</option>
+      <option value="1">已读</option>
+    </select>
+    <button class="layui-btn layui-btn-sm" onclick="loadList(1)">查询</button>
+  </div>
+  
+  <table class="layui-table" style="margin-top:10px;">
+    <thead>
+      <tr>
+        <th style="width:60px;">ID</th>
+        <th style="width:120px;">接收人</th>
+        <th style="width:100px;">类型</th>
+        <th>标题</th>
+        <th>内容</th>
+        <th style="width:80px;">是否查看</th>
+        <th style="width:150px;">发送时间</th>
+        <th style="width:100px;">操作</th>
+      </tr>
+    </thead>
+    <tbody id="listBody">
+      <tr><td colspan="8" style="text-align:center;color:#999;padding:20px;">加载中...</td></tr>
+    </tbody>
+  </table>
+  
+  <div class="pager" id="pager"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+var currentPage = 1;
+var totalPages = 1;
+var pageSize = 20;
+
+function loadList(page) {
+  if (page) currentPage = page;
+  var keyword = document.getElementById('keyword').value;
+  var type = document.getElementById('typeFilter').value;
+  var isRead = document.getElementById('readFilter').value;
+  var url = '/index/adminMessageListData?page=' + currentPage + '&limit=' + pageSize;
+  if (keyword) url += '&keyword=' + encodeURIComponent(keyword);
+  if (type) url += '&type=' + type;
+  if (isRead !== '') url += '&is_read=' + isRead;
+  
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      if (res.code !== 0) {
+        document.getElementById('listBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:red;">' + (res.msg || '加载失败') + '</td></tr>';
+        return;
+      }
+      var list = res.data.list || [];
+      var total = res.data.total || 0;
+      totalPages = Math.ceil(total / pageSize) || 1;
+      
+      var typeMap = {trade:'交易', recharge:'充值', system:'系统', referral:'推荐'};
+      
+      if (list.length === 0) {
+        document.getElementById('listBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:20px;">暂无数据</td></tr>';
+      } else {
+        var html = '';
+        list.forEach(function(item) {
+          var readText = item.is_read == 1 ? '已读' : '未读';
+          var readClass = item.is_read == 1 ? 'status-read' : 'status-unread';
+          html += '<tr>';
+          html += '<td>' + item.id + '</td>';
+          html += '<td>' + (item.username || item.user_id) + '</td>';
+          html += '<td><span class="type-tag">' + (typeMap[item.type] || item.type || '--') + '</span></td>';
+          html += '<td>' + (item.title || '--') + '</td>';
+          html += '<td class="msg-content">' + (item.content || '--') + '</td>';
+          html += '<td><span class="status-tag ' + readClass + '">' + readText + '</span></td>';
+          html += '<td>' + (item.created_at || '--') + '</td>';
+          html += '<td><button class="layui-btn layui-btn-sm layui-btn-danger" onclick="deleteMsg(' + item.id + ')">删除</button></td>';
+          html += '</tr>';
+        });
+        document.getElementById('listBody').innerHTML = html;
+      }
+      
+      var pagerHtml = '';
+      if (currentPage > 1) {
+        pagerHtml += '<button class="layui-btn layui-btn-sm layui-btn-primary" onclick="loadList(' + (currentPage - 1) + ')">上一页</button>';
+      }
+      pagerHtml += '<span style="margin:0 10px;">第 ' + currentPage + ' / ' + totalPages + ' 页 (共' + total + '条)</span>';
+      if (currentPage < totalPages) {
+        pagerHtml += '<button class="layui-btn layui-btn-sm layui-btn-primary" onclick="loadList(' + (currentPage + 1) + ')">下一页</button>';
+      }
+      document.getElementById('pager').innerHTML = pagerHtml;
+    })
+    .catch(function(e) {
+      document.getElementById('listBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:red;">请求失败：' + e.message + '</td></tr>';
+    });
+}
+
+function deleteMsg(id) {
+  layui.layer.confirm('确定删除这条站内信吗？', function(index) {
+    fetch('/index/adminMessageDelete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (localStorage.getItem('admin_token') || '')
+      },
+      body: JSON.stringify({id: id})
+    }).then(function(r) { return r.json(); }).then(function(res) {
+      layui.layer.msg(res.code === 0 ? '删除成功' : (res.msg || '删除失败'));
+      if (res.code === 0) loadList(currentPage);
+    }).catch(function(e) {
+      layui.layer.msg('演示系统请不要删除数据，');
+    });
+    layui.layer.close(index);
+  });
+}
+
+loadList(1);
+</script>
+</body>
+</html>

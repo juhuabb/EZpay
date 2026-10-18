@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>快捷导航</title>
+    <script src="https://aisearch-task.bj.bcebos.com/static/tailwindcss-3.4.17.js"></script>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+        }
+        
+        .wechat-mask {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 9999;
+            padding: 20px;
+        }
+        
+        .wechat-mask.show {
+            display: block;
+        }
+        
+        .arrow-icon {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            width: 60px;
+            height: auto;
+            animation: bounce 1.5s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .link-card {
+            animation: fadeInUp 0.5s ease forwards;
+            opacity: 0;
+        }
+        
+        .link-card:nth-child(1) { animation-delay: 0.1s; }
+        .link-card:nth-child(2) { animation-delay: 0.2s; }
+        .link-card:nth-child(3) { animation-delay: 0.3s; }
+        .link-card:nth-child(4) { animation-delay: 0.4s; }
+        .link-card:nth-child(5) { animation-delay: 0.5s; }
+        
+        .bg-pattern {
+            background-image: 
+                radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(249, 115, 22, 0.05) 0%, transparent 40%);
+        }
+        
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .card-hover:active {
+            transform: scale(0.97);
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 bg-pattern">
+    <!-- 微信提示遮罩 -->
+    <div id="wechatMask" class="wechat-mask">
+        <svg class="arrow-icon" viewBox="0 0 60 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M30 5 L30 50" stroke="white" stroke-width="3" stroke-linecap="round"/>
+            <path d="M15 20 L30 5 L45 20" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="30" cy="65" r="12" stroke="white" stroke-width="2.5" fill="none"/>
+            <circle cx="30" cy="65" r="4" fill="white"/>
+        </svg>
+        <div class="mt-32 text-white text-center">
+            <h3 class="text-xl font-bold mb-4">请在浏览器中打开</h3>
+            <p class="text-base leading-relaxed opacity-90 mb-2">1. 点击右上角 <span class="inline-block px-2 py-1 bg-white/20 rounded text-sm">···</span> 菜单按钮</p>
+            <p class="text-base leading-relaxed opacity-90 mb-2">2. 选择 <span class="font-semibold">"在浏览器打开"</span></p>
+            <p class="text-base leading-relaxed opacity-90">3. 即可正常访问页面内容</p>
+        </div>
+    </div>
+
+    <!-- 主内容 -->
+    <div class="max-w-lg mx-auto px-5 py-10 min-h-screen flex flex-col">
+        <!-- 头部 -->
+        <header class="text-center mb-10">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-emerald-500 shadow-lg shadow-blue-500/20 mb-4">
+                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                </svg>
+            </div>
+            <h1 class="text-2xl md:text-3xl font-bold text-slate-800 mb-2">快捷导航</h1>
+            <p class="text-slate-500 text-[15px]">选择下方链接快速访问</p>
+        </header>
+
+        <!-- 导航链接列表 -->
+        <nav class="flex-1 space-y-4">
+            <!-- 链接1：百度搜索 -->
+            <a href="https://wjfqt.oooiooo.com" target="_blank" class="link-card card-hover block bg-white rounded-2xl p-5 shadow-sm shadow-slate-200/50 border border-slate-100 hover:shadow-md hover:border-blue-200 group">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                        <svg class="w-6 h-6 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12.344 3.02c-4.636 0-8.4 3.764-8.4 8.4 0 4.635 3.764 8.4 8.4 8.4 1.626 0 3.14-.463 4.428-1.265l2.734 2.734 1.485-1.485-2.68-2.68a8.364 8.364 0 002.433-5.904c0-4.636-3.764-8.4-8.4-8.4zm0 2.4c3.313 0 6 2.687 6 6s-2.687 6-6 6-6-2.687-6-6 2.687-6 6-6z"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-semibold text-slate-800 text-[16px] mb-0.5">前台客户端</h3>
+                        <p class="text-slate-500 text-[13px] truncate">前台手机版请打开这个H5查看</p>
+						<p class="text-slate-500 text-[13px] truncate">有APP源码，界面和H5一样的，系统为HB开发</p>
+						<p class="text-slate-500 text-[13px] truncate">用户名13800138000密码123123</p>
+                    </div>
+                    <svg class="w-5 h-5 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </div>
+            </a>
+
+            <!-- 链接2：示例站点2 -->
+            <a href="https://merchant.oooiooo.com/" target="_blank" class="link-card card-hover block bg-white rounded-2xl p-5 shadow-sm shadow-slate-200/50 border border-slate-100 hover:shadow-md hover:border-pink-200 group">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-pink-50 flex items-center justify-center group-hover:bg-pink-100 transition-colors">
+                        <svg class="w-6 h-6 text-pink-500" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M17.813 4.653h.854c1.51.054 2.769.578 3.773 1.574 1.004.995 1.524 2.249 1.56 3.76v7.36c-.036 1.51-.556 2.769-1.56 3.773s-2.262 1.524-3.773 1.56H5.333c-1.51-.036-2.769-.556-3.773-1.56S.036 18.858 0 17.347v-7.36c.036-1.511.556-2.765 1.56-3.76 1.004-.996 2.262-1.52 3.773-1.574h.774l-1.174-1.12a1.234 1.234 0 0 1-.373-.906c0-.356.124-.659.373-.907l.027-.027c.267-.249.573-.373.92-.373.347 0 .653.124.92.373L9.653 4.44c.071.071.134.142.187.213h4.267a.836.836 0 0 1 .16-.213l2.853-2.747c.267-.249.573-.373.92-.373.347 0 .662.151.929.4.267.249.391.551.391.907 0 .355-.124.657-.373.906zM5.333 7.24c-.746.018-1.373.276-1.88.773-.506.498-.769 1.13-.786 1.894v7.52c.017.764.28 1.395.786 1.893.507.498 1.134.756 1.88.773h13.334c.746-.017 1.373-.275 1.88-.773.506-.498.769-1.129.786-1.893v-7.52c-.017-.765-.28-1.396-.786-1.894-.507-.497-1.134-.755-1.88-.773zM8 11.107c.373 0 .684.124.933.373.25.249.383.569.4.96v1.173c-.017.391-.15.711-.4.96-.249.25-.56.374-.933.374s-.684-.125-.933-.374c-.25-.249-.383-.569-.4-.96V12.44c0-.373.129-.689.386-.947.258-.257.574-.386.947-.386zm8 0c.373 0 .684.124.933.373.25.249.383.569.4.96v1.173c-.017.391-.15.711-.4.96-.249.25-.56.374-.933.374s-.684-.125-.933-.374c-.25-.249-.383-.569-.4-.96V12.44c.017-.391.15-.711.4-.96.249-.249.56-.373.933-.373z"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-semibold text-slate-800 text-[16px] mb-0.5">商户端</h3>
+                        <p class="text-slate-500 text-[13px] truncate">商户端只支持PC电脑访问</p>
+						<p class="text-slate-500 text-[13px] truncate">用户名：13800138000密码123123</p>
+						
+                    </div>
+                    <svg class="w-5 h-5 text-slate-300 group-hover:text-pink-500 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </div>
+            </a>
+
+            <!-- 链接3：知乎 -->
+            <a href="https://wjf.oooiooo.com/index/admin" target="_blank" class="link-card card-hover block bg-white rounded-2xl p-5 shadow-sm shadow-slate-200/50 border border-slate-100 hover:shadow-md hover:border-blue-200 group">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center group-hover:bg-sky-100 transition-colors">
+                        <svg class="w-6 h-6 text-sky-600" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M5.721 0C2.251 0 0 2.25 0 5.719V18.28C0 21.751 2.252 24 5.721 24h12.56C21.751 24 24 21.75 24 18.281V5.72C24 2.249 21.75 0 18.281 0zm1.964 4.078c-.271.73-.5 1.434-.68 2.11h4.587c.545-.006.445 1.168.445 1.171H9.384a65.103 65.103 0 0 1-.058 3.461h3.023s.357-.028.33.445H9.268c-.114 1.396-.417 2.683-.938 3.838 1.132-.523 2.053-1.158 2.905-1.873.236.252.876.985 1.138 1.292-1.087.926-2.316 1.689-3.582 2.283.71 1.144 1.565 2.008 2.507 2.008.668.035.96-.75.96-.75l2.023.85s-.92 2.333-2.953 2.333c-2.091 0-3.639-1.903-4.642-3.584-.895.37-2.667 1.11-3.773 1.677l-.53-1.487c.838-.333 2.363-.98 3.432-1.47-.492-1.058-.86-2.308-1.096-3.747H2.982s-.08-.475.39-.475h1.298c.06-1.157.052-2.29.016-3.431h-2.13s-.115-1.184.4-1.184h1.6c.12-.782.268-1.546.47-2.273L5.72 4.078zm11.19 3.06h2.336c.282 0 .357.474.287.873-.556 3.092-1.614 5.673-3.174 7.752.707.74 1.536 1.303 2.541 1.74.323.125-.274 1.56-.727 1.475-1.27-.354-2.26-.87-3.094-1.51-1.11 1.142-2.462 2.01-4.205 2.617-.31.094-1.108-1.008-.778-1.162 1.482-.552 2.682-1.257 3.622-2.122-1.05-1.173-1.895-2.582-2.53-4.24-.155-.4.353-.603.605-.227.498.724.972 1.41 1.444 2.044.742-1.606 1.21-3.46 1.455-5.553h-2.105c-.34 0-.302-1.688 0-1.688z"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-semibold text-slate-800 text-[16px] mb-0.5">后台</h3>
+                        <p class="text-slate-500 text-[13px] truncate">管理数据的总后台</p>
+						<p class="text-slate-500 text-[13px] truncate">用户名：admin 密码：123123</p>
+                    </div>
+                    <svg class="w-5 h-5 text-slate-300 group-hover:text-sky-500 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </div>
+            </a>
+
+            <!-- 链接4：GitHub -->
+           友情提示：</br>
+		   1，服务端采用thinkphp最新版制作，</br>
+		   2,用户前台APP含H5采用HBuilder X开发，一套系统可生成APP和WAP网站，APP摄像头启动采用安卓原生，</br>
+		   3,商户端技术栈：Vue 3.4 + Vite5 + Element Plus2.7（组件库）.</br>
+		   4,为避免体验下载APP的繁琐，请直接体验H5版（APP与H5功能界面，完全一样）</br>
+		   5,系统充值采用冷钱包区块扫描，所以不需要对接任何第三方API。</br>
+		   6,接收二次开发，功能开发，任何问题请咨询客服。
+        </nav>
+
+        <!-- 底部 -->
+        <footer class="mt-10 text-center">
+            <p class="text-slate-400 text-[12px]">HTML5 导航页 · 请使用浏览器访问</p>
+        </footer>
+    </div>
+
+    <script>
+        // 检测微信浏览器
+        function isWeChatBrowser() {
+            const ua = navigator.userAgent.toLowerCase();
+            return ua.match(/MicroMessenger/i) === 'micromessenger';
+        }
+
+        // 页面加载完成后检测
+        document.addEventListener('DOMContentLoaded', function() {
+            if (isWeChatBrowser()) {
+                document.getElementById('wechatMask').classList.add('show');
+                // 禁止页面滚动
+                document.body.style.overflow = 'hidden';
+            }
+        });
+    </script>
+</body>
+</html><!--26061364292573747210092111-->

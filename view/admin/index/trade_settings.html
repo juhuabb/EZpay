@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>交易设置</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+.settings-section{margin-bottom:25px;padding-bottom:20px;border-bottom:1px solid #e8e8e8}
+.settings-section:last-child{border-bottom:none}
+.section-title{font-size:16px;font-weight:bold;color:#333;margin-bottom:15px;padding-left:10px;border-left:3px solid #1E9FFF}
+</style>
+</head>
+<body style="padding:20px;background:#f5f6fa">
+<div style="background:#fff;padding:30px;border-radius:8px;max-width:700px">
+<h3 style="margin-bottom:25px">交易设置</h3>
+<form class="layui-form" lay-filter="tradeForm">
+
+<div class="settings-section">
+<div class="section-title">手续费设置</div>
+<div class="layui-form-item"><label class="layui-form-label">手续费率(%)</label><div class="layui-input-block"><input type="number" name="trade_fee_rate" class="layui-input" placeholder="如：2 表示2%" step="0.01"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">说明</label><div class="layui-input-block"><div style="padding:9px 0;color:#999;font-size:13px">用户发布挂单时，扣除积分 = 出售数量 + 出售数量 × 手续费率。如手续费率2%，出售100积分，则扣除102积分。</div></div></div>
+<div class="layui-form-item"><label class="layui-form-label">买入手续费率(%)</label><div class="layui-input-block"><input type="number" name="trade_buyer_fee_rate" class="layui-input" placeholder="如：1 表示1%，留空或0表示不收" step="0.01"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">说明</label><div class="layui-input-block"><div style="padding:9px 0;color:#999;font-size:13px">买家购买时，实付金额 = 购买金额 + 购买金额 × 买入手续费率。如设为0则买家无手续费。</div></div></div>
+</div>
+
+<div class="settings-section">
+<div class="section-title">交易限额</div>
+<div class="layui-form-item"><label class="layui-form-label">最小挂单量</label><div class="layui-input-block"><input type="number" name="trade_min_amount" class="layui-input" placeholder="单笔最小出售积分数量"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">最大挂单量</label><div class="layui-input-block"><input type="number" name="trade_max_amount" class="layui-input" placeholder="单笔最大出售积分数量（留空不限）"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">最小购买量</label><div class="layui-input-block"><input type="number" name="trade_min_buy" class="layui-input" placeholder="买家单笔最小购买积分数量" step="0.01"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">说明</label><div class="layui-input-block"><div style="padding:9px 0;color:#999;font-size:13px">买家购买挂单时，单笔购买数量不能低于此值。留空或设为0则不限制。</div></div></div>
+</div>
+
+<div class="settings-section">
+<div class="section-title">积分购买</div>
+<div class="layui-form-item"><label class="layui-form-label">快捷积分选项</label><div class="layui-input-block"><input type="text" name="recharge_points_options" class="layui-input" placeholder="如：50,100,500,1000,5000,10000"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">说明</label><div class="layui-input-block"><div style="padding:9px 0;color:#999;font-size:13px">前台充值页面快捷选择区域显示的积分档位，用英文逗号分隔。留空则使用默认值。</div></div></div>
+<div class="layui-form-item"><label class="layui-form-label">充值赠送</label><div class="layui-input-block"><input type="checkbox" name="recharge_bonus_enabled" lay-skin="switch" lay-text="开启|关闭"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">赠送比例(%)</label><div class="layui-input-block"><input type="number" name="recharge_bonus_percent" class="layui-input" placeholder="如：5 表示赠送5%" step="0.1"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">说明</label><div class="layui-input-block"><div style="padding:9px 0;color:#999;font-size:13px">开启后，前台充值页面币种选择框会显示"送X%"火热图标，首页充值入口也会显示火热图标。用户充值到账积分 = 实付积分 + 实付积分 × 赠送比例。</div></div></div>
+</div>
+
+<div class="layui-form-item"><div class="layui-input-block"><button class="layui-btn layui-btn-normal" lay-submit lay-filter="saveTrade">保存设置</button></div></div>
+</form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+var settingsData = {$settingsJson|raw};
+
+layui.use(['form','layer'], function(){
+    var form = layui.form;
+    var layer = layui.layer;
+
+    if(settingsData){
+        form.val('tradeForm', settingsData);
+    }
+
+    form.on('submit(saveTrade)', function(data){
+        fetch('/index/adminSystemSettingsSave', {
+            method: 'POST',
+            body: JSON.stringify(data.field),
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (localStorage.getItem('admin_token') || '')
+            }
+        }).then(function(r){ return r.json(); }).then(function(r){
+            layer.msg(r.code===0 ? '保存成功' : (r.msg||'保存失败'));
+        }).catch(function(e){
+            layer.msg('演示系统请不要删减这样参数设置');
+        });
+        return false;
+    });
+});
+</script>
+</body>
+</html>

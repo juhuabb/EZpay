@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认证审核 - 积分管理系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@3.1.1/dist/css/layui.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; }
+        .content-card {
+            background: #fff; border-radius: 6px; padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .tab-bar { margin-bottom: 16px; display: flex; gap: 10px; }
+        .tab-bar .layui-btn { border-radius: 4px; }
+        .tab-bar .layui-btn-active { background: #2979FF; color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="content-card">
+        <div class="tab-bar">
+            <button class="layui-btn tab-btn layui-btn-active" data-type="realname" data-status="">实名认证</button>
+            <button class="layui-btn tab-btn layui-btn-primary" data-type="merchant" data-status="">商户认证</button>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-bottom:16px;">
+            <select id="filterStatus" class="layui-input" style="width:160px;height:36px;">
+                <option value="">全部状态</option>
+                <option value="0">待审核</option>
+                <option value="1">已通过</option>
+                <option value="2">已拒绝</option>
+            </select>
+            <button class="layui-btn" id="btnSearch" style="background:#2979FF;height:36px;line-height:36px;">
+                <i class="layui-icon layui-icon-search"></i> 筛选
+            </button>
+        </div>
+
+        <table id="verifyTable" lay-filter="verifyTable"></table>
+    </div>
+
+    <script type="text/html" id="verifyStatusTpl">
+        {{# if(d.status === 0) { }}
+            <span class="layui-badge layui-bg-orange">待审核</span>
+        {{# } else if(d.status === 1) { }}
+            <span class="layui-badge layui-bg-green">已通过</span>
+        {{# } else { }}
+            <span class="layui-badge">已拒绝</span>
+        {{# } }}
+    </script>
+
+    <script type="text/html" id="verifyBar">
+        {{# if(d.status === 0) { }}
+            <a class="layui-btn layui-btn-xs" lay-event="review">审核</a>
+        {{# } }}
+        <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="detail">查看</a>
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/layui@3.1.1/dist/layui.js"></script>
+    <script>
+        var __apiToken = '';
+        window.addEventListener('message', function(e) { if (e.data && e.data.type === 'setToken') __apiToken = e.data.token; });
+
+        layui.use(['table', 'layer', 'element'], function() {
+            var table = layui.table;
+            var layer = layui.layer;
+            var $ = layui.$;
+            var currentType = 'realname';
+
+            function getApiUrl() {
+                if (currentType === 'realname') {
+                    return '/admin/verify/real-name';
+                } else {
+                    return '/admin/verify/merchant';
+                }
+            }
+
+            function getCols() {
+                if (currentType === 'realname') {
+                    return [[
+                        {field: 'id', title: 'ID', width: 80},
+                        {title: '用户', width: 150, templet: function(d){ return d.user ? d.user.username : '-'; }},
+                        {title: '手机号', width: 140, templet: function(d){ return d.user ? d.user.phone : '-'; }},
+                        {field: 'real_name', title: '真实姓名', width: 120},
+                        {field: 'id_card', title: '身份证号', width: 200},
+                        {field: 'status', title: '状态', width: 100, templet: '#verifyStatusTpl'},
+                        {field: 'created_at', title: '提交时间', width: 170},
+                        {title: '操作', width: 150, toolbar: '#verifyBar', fixed: 'right'}
+                    ]];
+                } else {
+                    return [[
+                        {field: 'id', title: 'ID', width: 80},
+                        {title: '用户', width: 150, templet: function(d){ return d.user ? d.user.username : '-'; }},
+                        {title: '手机号', width: 140, templet: function(d){ return d.user ? d.user.phone : '-'; }},
+                        {field: 'company_name', title: '企业名称', width: 200},
+                        {field: 'license_no', title: '营业执照号', width: 180},
+                        {field: 'status', title: '状态', width: 100, templet: '#verifyStatusTpl'},
+                        {field: 'created_at', title: '提交时间', width: 170},
+                        {title: '操作', width: 150, toolbar: '#verifyBar', fixed: 'right'}
+                    ]];
+                }
+            }
+
+            function renderTable() {
+                table.render({
+                    elem: '#verifyTable',
+                    url: getApiUrl(),
+                    headers: { 'Authorization': 'Bearer ' + __apiToken },
+                    where: { page: 1, page_size: 20, status: $('#filterStatus').val() },
+                    parseData: function(res) {
+                        return {
+                            code: res.code === 0 ? 0 : res.code,
+                            msg: res.msg,
+                            count: res.data ? res.data.total : 0,
+                            data: res.data ? res.data.list : []
+                        };
+                    },
+                    page: true,
+                    limit: 20,
+                    cols: getCols()
+                });
+            }
+
+            renderTable();
+
+            // Tab切换
+            $('.tab-btn').on('click', function() {
+                $('.tab-btn').removeClass('layui-btn-active').addClass('layui-btn-primary');
+                $(this).removeClass('layui-btn-primary').addClass('layui-btn-active');
+                currentType = $(this).data('type');
+                $('#filterStatus').val('');
+                renderTable();
+            });
+
+            // 筛选
+            $('#btnSearch').on('click', function() {
+                table.reload('verifyTable', {
+                    where: { status: $('#filterStatus').val() },
+                    page: { curr: 1 }
+                });
+            });
+
+            // 工具条事件
+            table.on('tool(verifyTable)', function(obj) {
+                var data = obj.data;
+                if (obj.event === 'review') {
+                    var reviewUrl = currentType === 'realname' 
+                        ? '/admin/verify/real-name/' + data.id + '/review'
+                        : '/admin/verify/merchant/' + data.id + '/review';
+                    
+                    layer.open({
+                        title: '认证审核',
+                        content: '<div style="padding:20px;">' +
+                            '<p style="margin-bottom:15px;">确认审核结果：</p>' +
+                            '<button class="layui-btn" id="btnApprove" style="background:#67c23a;">通过</button>' +
+                            '<button class="layui-btn layui-btn-danger" id="btnReject" style="margin-left:10px;">拒绝</button>' +
+                            '</div>',
+                        area: ['320px', 'auto'],
+                        success: function(layero) {
+                            layero.find('#btnApprove').on('click', function() {
+                                $.ajax({
+                                    url: reviewUrl,
+                                    type: 'POST',
+                                    headers: { 'Authorization': 'Bearer ' + __apiToken },
+                                    contentType: 'application/json',
+                                    data: JSON.stringify({ status: 1 }),
+                                    success: function(res) {
+                                        if (res.code === 0) {
+                                            layer.msg('已通过', {icon: 1});
+                                            layer.closeAll();
+                                            table.reload('verifyTable');
+                                        } else {
+                                            layer.msg(res.msg, {icon: 2});
+                                        }
+                                    }
+                                });
+                            });
+                            layero.find('#btnReject').on('click', function() {
+                                $.ajax({
+                                    url: reviewUrl,
+                                    type: 'POST',
+                                    headers: { 'Authorization': 'Bearer ' + __apiToken },
+                                    contentType: 'application/json',
+                                    data: JSON.stringify({ status: 2 }),
+                                    success: function(res) {
+                                        if (res.code === 0) {
+                                            layer.msg('已拒绝', {icon: 1});
+                                            layer.closeAll();
+                                            table.reload('verifyTable');
+                                        } else {
+                                            layer.msg(res.msg, {icon: 2});
+                                        }
+                                    }
+                                });
+                            });
+                        }
+                    });
+                } else if (obj.event === 'detail') {
+                    var detailUrl = currentType === 'realname' 
+                        ? '/admin/view/verify/' + data.id
+                        : '/admin/view/merchants/' + data.id;
+                    layer.open({
+                        type: 2,
+                        title: '认证详情',
+                        area: ['700px', '500px'],
+                        content: detailUrl
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>内容管理 - 积分管理系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+    <link href="https://cdn.jsdelivr.net/npm/ueditor-static@1.4.331/themes/default/css/ueditor.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; }
+        .content-card { background: #fff; border-radius: 6px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .search-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+        .search-bar .layui-input { width: 160px; height: 36px; }
+        .type-badge-news { background: #1E9FFF; }
+        .type-badge-announcement { background: #FFB800; }
+    </style>
+    <script>
+        window.UEDITOR_HOME_URL = 'https://cdn.jsdelivr.net/npm/ueditor-static@1.4.331/';
+        window.UEDITOR_CONFIG = window.UEDITOR_CONFIG || {};
+        window.UEDITOR_CONFIG.UEDITOR_HOME_URL = 'https://cdn.jsdelivr.net/npm/ueditor-static@1.4.331/';
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/ueditor-static@1.4.331/ueditor.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ueditor-static@1.4.331/lang/zh-cn/zh-cn.js"></script>
+</head>
+<body>
+    <div class="content-card">
+        <div class="search-bar">
+            <select id="filterType" class="layui-input" style="width:140px;">
+                <option value="">全部</option>
+                <option value="announcement">公告</option>
+                <option value="news">新闻</option>
+            </select>
+            <select id="filterStatus" class="layui-input" style="width:120px;">
+                <option value="">全部状态</option>
+                <option value="1">显示</option>
+                <option value="0">隐藏</option>
+            </select>
+            <button class="layui-btn" id="btnSearch" style="background:#2979FF;height:36px;line-height:36px;">
+                <i class="layui-icon layui-icon-search"></i> 搜索
+            </button>
+            <button class="layui-btn layui-btn-normal" id="btnAdd" style="height:36px;line-height:36px;">
+                <i class="layui-icon layui-icon-add-1"></i> 发布内容
+            </button>
+        </div>
+        <table id="contentTable" lay-filter="contentTable"></table>
+    </div>
+
+    <script type="text/html" id="typeTpl">
+        {{# if(d.type === 'news') { }}
+            <span class="layui-badge type-badge-news">新闻</span>
+        {{# } else { }}
+            <span class="layui-badge type-badge-announcement">公告</span>
+        {{# } }}
+    </script>
+
+    <script type="text/html" id="statusTpl">
+        {{# if(d.status === 1) { }}
+            <span class="layui-badge layui-bg-green">显示</span>
+        {{# } else { }}
+            <span class="layui-badge layui-bg-gray">隐藏</span>
+        {{# } }}
+    </script>
+
+    <script type="text/html" id="contentBar">
+        <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+        <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="delete">删除</a>
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+    <script>
+        var __ue = null;
+
+        layui.use(['table', 'layer', 'form', 'laydate'], function() {
+            var table = layui.table;
+            var layer = layui.layer;
+            var form = layui.form;
+            var laydate = layui.laydate;
+            var $ = layui.$;
+
+            table.render({
+                elem: '#contentTable',
+                url: '/index/adminContentListData',
+                where: { page: 1, limit: 20 },
+                parseData: function(res) {
+                    return {
+                        code: res.code === 0 ? 0 : res.code,
+                        msg: res.msg,
+                        count: res.data ? res.data.total : 0,
+                        data: res.data ? res.data.list : []
+                    };
+                },
+                page: true,
+                limit: 20,
+                limits: [10, 20, 50],
+                cols: [[
+                    {field: 'id', title: 'ID', width: 80, sort: true},
+                    {field: 'type', title: '类型', width: 100, templet: '#typeTpl'},
+                    {field: 'title', title: '标题', width: 280},
+                    {field: 'content', title: '内容预览', width: 350, templet: function(d) {
+                        var c = d.content || '';
+                        var text = c.replace(/<[^>]+>/g, '');
+                        return text.length > 50 ? text.substring(0, 50) + '...' : text;
+                    }},
+                    {field: 'status', title: '状态', width: 100, templet: '#statusTpl'},
+                    {field: 'sort_order', title: '排序', width: 80, sort: true},
+                    {field: 'created_at', title: '发布时间', width: 170},
+                    {title: '操作', width: 140, toolbar: '#contentBar', fixed: 'right'}
+                ]]
+            });
+
+            $('#btnSearch').on('click', function() {
+                var where = {};
+                var type = $('#filterType').val();
+                var status = $('#filterStatus').val();
+                if (type) where.type = type;
+                if (status !== '') where.status = status;
+                table.reload('contentTable', { where: where, page: { curr: 1 } });
+            });
+
+            $('#btnAdd').on('click', function() { openForm(); });
+
+            function destroyEditor() {
+                if (__ue) {
+                    try { __ue.destroy(); } catch(e) {}
+                    __ue = null;
+                }
+                try { UE.delEditor('editor'); } catch(e) {}
+            }
+
+            function openForm(data) {
+                var isEdit = !!data;
+                var title = isEdit ? '编辑内容' : '发布内容';
+
+                destroyEditor();
+
+                var nowDate = new Date();
+                var pad = function(n) { return n < 10 ? '0' + n : n; };
+                var defaultDate = nowDate.getFullYear() + '-' + pad(nowDate.getMonth()+1) + '-' + pad(nowDate.getDate())
+                    + ' ' + pad(nowDate.getHours()) + ':' + pad(nowDate.getMinutes()) + ':' + pad(nowDate.getSeconds());
+                var dateValue = isEdit ? (data.created_at || defaultDate) : defaultDate;
+
+                var html = '<div style="padding:20px;">'
+                    + '<div class="layui-form-item"><label class="layui-form-label">类型</label><div class="layui-input-block">'
+                    + '<select id="formType">'
+                    + '<option value="announcement"' + (!isEdit || data.type === 'announcement' ? ' selected' : '') + '>公告</option>'
+                    + '<option value="news"' + (isEdit && data.type === 'news' ? ' selected' : '') + '>新闻</option>'
+                    + '</select></div></div>'
+                    + '<div class="layui-form-item"><label class="layui-form-label">标题</label><div class="layui-input-block">'
+                    + '<input type="text" id="formTitle" required placeholder="请输入标题" class="layui-input" value="' + (isEdit ? (data.title || '').replace(/"/g, '&quot;') : '') + '"></div></div>'
+                    + '<div class="layui-form-item"><label class="layui-form-label">内容</label><div class="layui-input-block">'
+                    + '<div id="editor" style="width:100%;"></div>'
+                    + '</div></div>'
+                    + '<div class="layui-form-item"><label class="layui-form-label">发布日期</label><div class="layui-input-block">'
+                    + '<input type="text" id="formPublishDate" placeholder="选择发布日期时间" class="layui-input" value="' + dateValue + '">'
+                    + '</div></div>'
+                    + '<div class="layui-form-item"><label class="layui-form-label">排序</label><div class="layui-input-block">'
+                    + '<input type="number" id="formSortOrder" placeholder="数字越大越靠前" class="layui-input" value="' + (isEdit ? (data.sort_order || 0) : 0) + '"></div></div>'
+                    + '<div class="layui-form-item"><label class="layui-form-label">状态</label><div class="layui-input-block">'
+                    + '<select id="formStatus"><option value="1"' + (!isEdit || data.status === 1 ? ' selected' : '') + '>显示</option>'
+                    + '<option value="0"' + (isEdit && data.status === 0 ? ' selected' : '') + '>隐藏</option></select></div></div>'
+                    + '</div>';
+
+                layer.open({
+                    type: 1,
+                    title: title,
+                    area: ['780px', '640px'],
+                    content: html,
+                    success: function(layero) {
+                        form.render('select');
+
+                        laydate.render({
+                            elem: '#formPublishDate',
+                            type: 'datetime',
+                            format: 'yyyy-MM-dd HH:mm:ss'
+                        });
+
+                        if (typeof UE === 'undefined') {
+                            layer.msg('UEditor加载失败，请刷新页面重试', {icon: 2});
+                            return;
+                        }
+
+                        setTimeout(function() {
+                            __ue = UE.getEditor('editor', {
+                                serverUrl: '/index/adminContentUpload',
+                                toolbars: [[
+                                    'bold', 'italic', 'underline', 'strikethrough', '|',
+                                    'forecolor', 'backcolor', '|',
+                                    'fontsize', 'fontfamily', '|',
+                                    'insertorderedlist', 'insertunorderedlist', '|',
+                                    'lineheight', '|',
+                                    'justifyleft', 'justifycenter', 'justifyright', '|',
+                                    'simpleupload', '|',
+                                    'link', 'unlink', '|',
+                                    'horizontal', '|',
+                                    'removeformat', 'source'
+                                ]],
+                                initialFrameHeight: 240,
+                                initialFrameWidth: '100%',
+                                autoHeightEnabled: false,
+                                elementPathEnabled: false,
+                                wordCount: false,
+                                zIndex: 99999999
+                            });
+
+                            __ue.ready(function() {
+                                if (isEdit && data.content) {
+                                    __ue.setContent(data.content);
+                                }
+                            });
+                        }, 200);
+                    },
+                    btn: ['演示系统禁止提交数据', '取消'],
+                    yes: function(index) {
+                        var type = $('#formType').val();
+                        var titleVal = $('#formTitle').val().trim();
+                        var content = __ue ? __ue.getContent() : '';
+                        var sortOrder = $('#formSortOrder').val();
+                        var status = $('#formStatus').val();
+                        var publishDate = $('#formPublishDate').val().trim();
+
+                        if (!titleVal) { layer.msg('请输入标题', {icon: 0}); return; }
+                        if (!content || content === '<p><br></p>') { layer.msg('请输入内容', {icon: 0}); return; }
+                        if (!publishDate) { layer.msg('请选择发布日期', {icon: 0}); return; }
+
+                        var postData = {
+                            type: type, title: titleVal, content: content,
+                            sort_order: sortOrder || 0, status: status,
+                            publish_date: publishDate
+                        };
+                       
+
+                        $.ajax({
+                            url: url, type: 'POST', data: postData,
+                            success: function(res) {
+                                if (res.code === 0) {
+                                    layer.msg(res.msg || (isEdit ? '更新成功' : '发布成功'), {icon: 1});
+                                    layer.close(index);
+                                    destroyEditor();
+                                    table.reload('contentTable');
+                                } else {
+                                    layer.msg(res.msg || '演示系统禁止修改', );
+                                }
+                            },
+                            error: function() { layer.msg('演示系统禁止修改',); }
+                        });
+                    },
+                    cancel: function() { destroyEditor(); },
+                    end: function() { destroyEditor(); }
+                });
+            }
+
+            table.on('tool(contentTable)', function(obj) {
+                var data = obj.data;
+                if (obj.event === 'edit') {
+                    openForm(data);
+                } else if (obj.event === 'delete') {
+                    layer.confirm('确认删除该条内容？', function(index) {
+                        $.ajax({
+                            url: '/index/adminContentDelete?id=' + data.id, type: 'POST',
+                            success: function(res) {
+                                if (res.code === 0) {
+                                    layer.msg('删除成功', {icon: 1});
+                                    table.reload('contentTable');
+                                } else { layer.msg(res.msg || '演示系统禁止修改', );}
+                            }
+                        });
+                        layer.close(index);
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

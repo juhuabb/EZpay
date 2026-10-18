@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>投诉管理</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+body { background: #f0f2f5; padding: 20px; margin: 0; }
+.card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.status-tag { padding: 2px 10px; border-radius: 4px; font-size: 12px; display: inline-block; }
+.status-0 { background: #fff7e6; color: #fa8c16; }
+.status-1 { background: #e6f7ff; color: #1890ff; }
+.status-2 { background: #f6ffed; color: #52c41a; }
+.pager { margin-top: 15px; text-align: center; }
+.pager button { margin: 0 5px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2 style="font-size:16px;margin:0 0 15px 0;">投诉管理</h2>
+  
+  <div style="margin-bottom:15px;">
+    <select id="statusFilter" style="width:150px;display:inline-block;height:38px;border:1px solid #e6e6e6;border-radius:2px;">
+      <option value="">全部状态</option>
+      <option value="0">待处理</option>
+      <option value="1">已回复</option>
+      <option value="2">已解决</option>
+    </select>
+    <button class="layui-btn layui-btn-sm" onclick="loadList(1)">查询</button>
+  </div>
+  
+  <table class="layui-table" style="margin-top:10px;">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>订单号</th>
+        <th>买家ID</th>
+        <th>卖家ID</th>
+        <th>数量</th>
+        <th>金额</th>
+        <th>状态</th>
+        <th>提交时间</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody id="listBody">
+      <tr><td colspan="9" style="text-align:center;color:#999;padding:20px;">加载中...</td></tr>
+    </tbody>
+  </table>
+  
+  <div class="pager" id="pager"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+var currentPage = 1;
+var totalPages = 1;
+var pageSize = 20;
+
+function loadList(page) {
+  if (page) currentPage = page;
+  var status = document.getElementById('statusFilter').value;
+  var url = '/index/adminComplaintListData?page=' + currentPage + '&limit=' + pageSize;
+  if (status) url += '&status=' + status;
+  
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      if (res.code !== 0) {
+        document.getElementById('listBody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:red;">' + (res.msg || '加载失败') + '</td></tr>';
+        return;
+      }
+      var list = res.data.list || [];
+      var total = res.data.total || 0;
+      totalPages = Math.ceil(total / pageSize) || 1;
+      
+      var statusMap = {0: '待处理', 1: '已回复', 2: '已解决'};
+      var statusClass = {0: 'status-0', 1: 'status-1', 2: 'status-2'};
+      
+      if (list.length === 0) {
+        document.getElementById('listBody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:#999;padding:20px;">暂无数据</td></tr>';
+      } else {
+        var html = '';
+        list.forEach(function(item) {
+          html += '<tr>';
+          html += '<td>' + item.id + '</td>';
+          html += '<td>' + (item.order_no || '--') + '</td>';
+          html += '<td>' + item.buyer_id + '</td>';
+          html += '<td>' + item.seller_id + '</td>';
+          html += '<td>' + item.points_amount + '</td>';
+          html += '<td>¥' + item.total_price + '</td>';
+          html += '<td><span class="status-tag ' + (statusClass[item.status] || '') + '">' + (statusMap[item.status] || '未知') + '</span></td>';
+          html += '<td>' + (item.create_time || '--') + '</td>';
+          html += '<td><button class="layui-btn layui-btn-sm" onclick="viewDetail(' + item.id + ')">查看详情</button></td>';
+          html += '</tr>';
+        });
+        document.getElementById('listBody').innerHTML = html;
+      }
+      
+      // 简单分页按钮
+      var pagerHtml = '';
+      if (currentPage > 1) {
+        pagerHtml += '<button class="layui-btn layui-btn-sm layui-btn-primary" onclick="loadList(' + (currentPage - 1) + ')">上一页</button>';
+      }
+      pagerHtml += '<span style="margin:0 10px;">第 ' + currentPage + ' / ' + totalPages + ' 页 (共' + total + '条)</span>';
+      if (currentPage < totalPages) {
+        pagerHtml += '<button class="layui-btn layui-btn-sm layui-btn-primary" onclick="loadList(' + (currentPage + 1) + ')">下一页</button>';
+      }
+      document.getElementById('pager').innerHTML = pagerHtml;
+    })
+    .catch(function(e) {
+      document.getElementById('listBody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:red;">请求失败：' + e.message + '</td></tr>';
+    });
+}
+
+function viewDetail(id) {
+  window.location.href = '/index/adminComplaintDetail?id=' + id;
+}
+
+loadList(1);
+</script>
+</body>
+</html>

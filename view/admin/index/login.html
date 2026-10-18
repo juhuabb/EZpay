@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>后台登录</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;display:flex;align-items:center;justify-content:center}
+.box{background:#fff;border-radius:12px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.box h2{text-align:center;margin-bottom:30px;color:#333}
+.fg{margin-bottom:20px}
+.fg label{display:block;margin-bottom:6px;color:#555;font-size:14px}
+.fg input{width:100%;padding:12px 16px;border:1px solid #ddd;border-radius:8px;font-size:15px;outline:none}
+.fg input:focus{border-color:#667eea}
+.btn{width:100%;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer}
+.msg{text-align:center;margin-top:15px;color:#e74c3c;font-size:14px;display:none}
+</style>
+</head>
+<body>
+<div class="box">
+<h2>后台管理系统</h2>
+<form id="f">
+<div class="fg"><label>用户名</label><input type="text" name="username" required></div>
+<div class="fg"><label>密码</label><input type="password" name="password" required></div>
+<button type="submit" class="btn">登 录</button>
+<div class="msg" id="m"></div>
+</form>
+</div>
+<script>
+document.getElementById('f').addEventListener('submit',function(e){
+e.preventDefault();
+var d=new FormData(this),m=document.getElementById('m');
+fetch('/index/adminAuthLogin',{method:'POST',body:JSON.stringify({username:d.get('username'),password:d.get('password')}),headers:{'Content-Type':'application/json'}})
+.then(function(r){return r.json()}).then(function(r){
+if(r.code===0){localStorage.setItem('admin_token',r.data.token);location.href='/index/homePanel9x'}
+else{m.textContent=r.msg||'登录失败';m.style.display='block'}
+}).catch(function(){m.textContent='网络错误';m.style.display='block'});
+});
+</script>
+</body>
+</html>

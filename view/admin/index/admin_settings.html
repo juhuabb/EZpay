@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>管理员设置</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+.settings-section{margin-bottom:25px;padding-bottom:20px;border-bottom:1px solid #e8e8e8}
+.settings-section:last-child{border-bottom:none}
+.section-title{font-size:16px;font-weight:bold;color:#333;margin-bottom:15px;padding-left:10px;border-left:3px solid #1E9FFF}
+</style>
+</head>
+<body style="padding:20px;background:#f5f6fa">
+<div style="background:#fff;padding:30px;border-radius:8px;max-width:800px">
+<h3 style="margin-bottom:25px">管理员设置</h3>
+
+<div class="settings-section">
+
+<div class="layui-form-item">
+<img src="/img/4.jpg">
+</div>
+<div class="section-title">管理员的设置和添加，演示系统禁止操作</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+layui.use(['layer','jquery'],function(){
+    var $=layui.jquery;
+    var layer=layui.layer;
+
+    function loadData(){
+        fetch('/index/adminSettingsData',{headers:{'X-Requested-With':'XMLHttpRequest'}})
+            .then(function(r){return r.json();})
+            .then(function(res){
+                if(res.code===0){
+                    var c=res.data.current;
+                    $('#myUsername').text(c.username);
+                    $('#myNickname').val(c.nickname);
+                    var html='';
+                    res.data.list.forEach(function(a){
+                        var sb=a.status==1?'<span style="color:#5FB878">正常</span>':'<span style="color:#FF5722">已停用</span>';
+                        var rt=a.role==='super'?'超级管理员':'管理员';
+                        var ab=a.id==c.id?'<span style="color:#999">当前账号</span>':(a.status==1?'<button class="layui-btn layui-btn-xs layui-btn-danger" onclick="toggleStatus('+a.id+')">停用</button>':'<button class="layui-btn layui-btn-xs" onclick="toggleStatus('+a.id+')">启用</button>');
+                        html+='<tr><td>'+a.id+'</td><td>'+a.username+'</td><td>'+(a.nickname||'\u2014')+'</td><td>'+rt+'</td><td>'+sb+'</td><td>'+ab+'</td></tr>';
+                    });
+                    $('#adminTableBody').html(html);
+                }
+            });
+    }
+    loadData();
+
+    $('#btnSaveNickname').on('click',function(){
+        var n=$('#myNickname').val().trim();
+        if(!n){layer.msg('昵称不能为空');return;}
+        fetch('/index/adminUpdateNickname',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'nickname='+encodeURIComponent(n)})
+            .then(function(r){return r.json();})
+            .then(function(res){layer.msg(res.msg);if(res.code===0){loadData();}});
+    });
+
+    $('#btnChangePassword').on('click',function(){
+        var o=$('#oldPassword').val(),n=$('#newPassword').val(),c=$('#confirmPassword').val();
+        if(!o||!n){layer.msg('请填写完整');return;}
+        if(n.length<6){layer.msg('新密码至少6位');return;}
+        if(n!==c){layer.msg('两次密码不一致');return;}
+        fetch('/index/adminChangePassword',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'old_password='+encodeURIComponent(o)+'&new_password='+encodeURIComponent(n)})
+            .then(function(r){return r.json();})
+            .then(function(res){
+                layer.msg(res.msg);
+                if(res.code===0){$('#oldPassword').val('');$('#newPassword').val('');$('#confirmPassword').val('');}
+            });
+    });
+
+    $('#btnShowAdd').on('click',function(){$('#addForm').toggle();});
+    $('#btnCancelAdd').on('click',function(){$('#addForm').hide();$('#newUsername').val('');$('#newNickname').val('');$('#newAdminPassword').val('');});
+
+    $('#btnAddAdmin').on('click',function(){
+        var u=$('#newUsername').val().trim(),n=$('#newNickname').val().trim(),p=$('#newAdminPassword').val();
+        if(!u){layer.msg('用户名不能为空');return;}
+        if(p.length<6){layer.msg('密码至少6位');return;}
+        fetch('/index/adminAddAdmin',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'username='+encodeURIComponent(u)+'&nickname='+encodeURIComponent(n)+'&password='+encodeURIComponent(p)})
+            .then(function(r){return r.json();})
+            .then(function(res){
+                layer.msg(res.msg);
+                if(res.code===0){$('#newUsername').val('');$('#newNickname').val('');$('#newAdminPassword').val('');$('#addForm').hide();loadData();}
+            });
+    });
+});
+
+function toggleStatus(id){
+    fetch('/index/adminToggleAdminStatus',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'id='+id})
+        .then(function(r){return r.json();})
+        .then(function(res){layui.layer.msg(res.msg);if(res.code===0){location.reload();}});
+}
+</script>
+</body>
+</html>

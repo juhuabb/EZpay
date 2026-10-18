@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>用户管理</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+</head>
+<body>
+<div class="layuimini-container">
+    <div class="layuimini-main">
+        <fieldset class="table-search-field">
+            <div class="layui-form-item">
+                <div class="layui-inline">
+                    <input class="layui-input" id="searchKeyword" placeholder="用户名/手机号/邮箱">
+                </div>
+                <div class="layui-inline">
+                    <select id="searchStatus">
+                        <option value="">全部状态</option>
+                        <option value="1">正常</option>
+                        <option value="0">已锁定</option>
+                    </select>
+                </div>
+                <div class="layui-inline">
+                    <select id="searchRole">
+                        <option value="">全部角色</option>
+                        <option value="user">用户</option>
+                        <option value="merchant">商户</option>
+                    </select>
+                </div>
+                <div class="layui-inline">
+                   <button class="layui-btn layui-btn-normal" id="btnSearch"><i class="layui-icon layui-icon-search"></i> 搜索</button>
+                    <button class="layui-btn" id="btnReset"><i class="layui-icon layui-icon-refresh"></i> 重置</button>
+                    <button class="layui-btn layui-btn-warm" id="btnAddUser" style="margin-left:10px;background:#FF9800;"><i class="layui-icon layui-icon-add-1"></i> 添加用户</button>
+                </div>
+            </div>
+        </fieldset>
+
+        <div class="layui-btn-group" style="margin-bottom:10px;">
+            <button class="layui-btn layui-btn-sm" id="btnReload"><i class="layui-icon layui-icon-refresh"></i> 刷新</button>
+        </div>
+
+        <table id="userTable" lay-filter="userTable"></table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+function postJSON(url, data) {
+    return fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+        body: JSON.stringify(data)
+    }).then(function(res) { return res.json(); });
+}
+
+layui.use(['form', 'table', 'layer'], function() {
+    var form = layui.form;
+    var table = layui.table;
+    var layer = layui.layer;
+
+    table.render({
+        elem: '#userTable',
+        url: '/index/adminUserListData',
+        where: {},
+        parseData: function(res) {
+            return {code: res.code === 0 ? 0 : res.code, msg: res.msg, count: res.data ? res.data.total : 0, data: res.data ? res.data.list : []};
+        },
+        page: true,
+        limit: 15,
+        limits: [10, 15, 20, 50],
+        cols: [[
+            {field: 'id', title: 'ID', width: 60, sort: true},
+            {field: 'username', title: '用户名', minWidth: 100},
+            {field: 'nickname', title: '昵称', minWidth: 80, templet: function(d){ return d.nickname || '<span style="color:#999;">-</span>'; }},
+            {field: 'phone', title: '手机号', minWidth: 110},
+            {field: 'email', title: '邮箱', minWidth: 140, templet: function(d){ return d.email || '<span style="color:#999;">-</span>'; }},
+            {field: 'real_name_verified', title: '实名', width: 60, templet: function(d){
+                return d.real_name_verified == 1 ? '<span style="color:green;">是</span>' : '<span style="color:#999;">否</span>';
+            }},
+            {field: 'merchant_verified', title: '商户', width: 60, templet: function(d){
+                return d.merchant_verified == 1 ? '<span style="color:red;font-weight:bold;font-size:16px;">商</span>' : '';
+            }},
+            {field: 'balance', title: '余额', width: 100, templet: function(d){ return '¥' + (parseFloat(d.balance)||0).toFixed(2); }},
+            {field: 'principal', title: '本金', width: 100, templet: function(d){ return '¥' + (parseFloat(d.principal)||0).toFixed(2); }},
+            {field: 'bonus', title: '奖金', width: 100, templet: function(d){ return '¥' + (parseFloat(d.bonus)||0).toFixed(2); }},
+            {field: 'role', title: '角色', width: 80, templet: function(d){ return d.role === 'merchant' ? '商户' : '用户'; }},
+            {field: 'status', title: '状态', width: 80, templet: function(d){ return d.status == 1 ? '<span style="color:green;">正常</span>' : '<span style="color:red;">已锁定</span>';}},
+            {field: 'created_at', title: '注册时间', width: 160},
+            {field: 'last_login_at', title: '登录时间', width: 160, templet: function(d){
+                return d.last_login_at ? d.last_login_at : '<span style="color:#999;">从未登录</span>';
+            }},
+            {title: '操作', width: 300, toolbar: '#userToolbar'}
+        ]]
+    });
+
+    // 工具条事件
+    table.on('tool(userTable)', function(obj) {
+        var data = obj.data;
+
+        // 认证管理弹窗
+        if (obj.event === 'verify') {
+            var realNameChecked = data.real_name_verified == 1 ? 'checked' : '';
+            var merchantChecked = data.merchant_verified == 1 ? 'checked' : '';
+            var html = '<div style="padding:20px;">';
+            html += '<div class="layui-form-item"><label class="layui-form-label">用户</label><div class="layui-input-block"><input type="text" value="' + (data.username||'') + '" class="layui-input" disabled></div></div>';
+            html += '<hr>';
+            html += '<div class="layui-form-item"><label class="layui-form-label">实名认证</label><div class="layui-input-block"><input type="checkbox" id="dlgRealName" name="real_name" lay-skin="switch" lay-text="已认证|未认证" ' + realNameChecked + '></div></div>';
+            html += '<div class="layui-form-item"><label class="layui-form-label">商户认证</label><div class="layui-input-block"><input type="checkbox" id="dlgMerchant" name="merchant" lay-skin="switch" lay-text="已认证|未认证" ' + merchantChecked + '></div></div>';
+            html += '<div class="layui-form-item"><div class="layui-input-block"><button type="button" class="layui-btn" id="dlgSaveVerify">保存设置</button></div></div>';
+            html += '</div>';
+
+            layer.open({type: 1, title: '认证管理 - ' + data.username, area: ['460px', '340px'], content: html, success: function(layero) {
+                form.render();
+                var saveBtn = layero.find('#dlgSaveVerify')[0];
+                saveBtn.onclick = function() {
+                    var realNameVal = layero.find('#dlgRealName')[0].checked ? 1 : 0;
+                    var merchantVal = layero.find('#dlgMerchant')[0].checked ? 1 : 0;
+
+                    // 先保存实名认证
+                    postJSON('/index/adminUserSetVerify', {user_id: data.id, real_name_verified: realNameVal}).then(function(res1) {
+                        // 再保存商户认证
+                        return postJSON('/index/adminUserSetMerchant', {user_id: data.id, merchant_verified: merchantVal});
+                    }).then(function(res2) {
+                        layer.msg('认证设置已保存');
+                        layer.closeAll();
+                        table.reload('userTable');
+                    }).catch(function() {
+                        layer.msg('对不起，演示系统请不要修改数据状态');
+                    });
+                };
+            }});
+        }
+
+        // 收款信息弹窗
+        if (obj.event === 'payment') {
+            layer.open({
+                type: 1,
+                title: '收款方式 - ' + data.username,
+                area: ['700px', '560px'],
+                content: '<div id="payLoad" style="padding:20px;text-align:center;">加载中...</div>',
+                success: function() {
+                    fetch('/index/adminUserPaymentMethods?user_id=' + data.id, {
+                        headers: {'X-Requested-With': 'XMLHttpRequest'}
+                    }).then(function(res) { return res.json(); }).then(function(res) {
+                        if (res.code !== 0) {
+                            document.getElementById('payLoad').innerHTML = '<span style="color:red;">' + (res.msg || '加载失败') + '</span>';
+                            return;
+                        }
+                        var m = res.data.merchant;
+                        var list = res.data.methods;
+                        var isMerchant = data.merchant_verified == 1;
+                        var html = '<div style="padding:20px;">';
+                        if (!list || list.length === 0) {
+                            html += '<div style="text-align:center;color:#999;padding:40px 0;">该用户暂无收款方式</div>';
+                        } else {
+                            html += '<table class="layui-table" lay-size="sm"><thead><tr><th>类型</th><th>姓名</th><th>账号</th><th>开户银行</th><th>开户行</th><th>默认</th>' + (isMerchant ? '<th>操作</th>' : '') + '</tr></thead><tbody>';
+                            var typeMap = {alipay: '支付宝', wechat: '微信', bank: '银行卡', qq: 'QQ', dcep: '数字人民币'};
+                            for (var i = 0; i < list.length; i++) {
+                                var item = list[i];
+                                var typeName = typeMap[item.type] || item.type;
+                                var acct = item.type === 'wechat' ? '-' : (item.account_no || '-');
+                                var bank = item.type === 'bank' ? (item.bank_name || '-') : '-';
+                                var branch = item.type === 'bank' ? (item.bank_branch || '-') : '-';
+                                var def = item.is_default == 1 ? '<span style="color:green;">是</span>' : '否';
+                                var actionCol = '';
+                                if (isMerchant) {
+                                    if (item.type === 'dcep') {
+                                        var dcepBtns = '';
+                                        if (item.code_image_url) dcepBtns += '<a href="' + item.code_image_url + '" target="_blank" class="layui-btn layui-btn-xs layui-btn-normal">编码图</a> ';
+                                        if (item.id_card_image) dcepBtns += '<a href="' + item.id_card_image + '" target="_blank" class="layui-btn layui-btn-xs layui-btn-normal">实名图</a>';
+                                        actionCol = '<td>' + (dcepBtns || '-') + '</td>';
+                                    } else if (item.qrcode_url) {
+                                        actionCol = '<td><a href="' + item.qrcode_url + '" target="_blank" class="layui-btn layui-btn-xs layui-btn-normal">查看</a> <a href="' + item.qrcode_url + '" download class="layui-btn layui-btn-xs">下载</a></td>';
+                                    } else {
+                                        actionCol = '<td>-</td>';
+                                    }
+                                }
+                                html += '<tr><td>' + typeName + '</td><td>' + (item.account_name || '-') + '</td><td>' + acct + '</td><td>' + bank + '</td><td>' + branch + '</td><td>' + def + '</td>' + actionCol + '</tr>';
+                                // 图片显示逻辑：银行卡不显示图片，其他类型都显示
+                                if (item.type !== 'bank') {
+                                    var imgHtml = '<tr><td colspan="' + (isMerchant ? 7 : 6) + '" style="text-align:center;">';
+                                    if (item.type === 'dcep') {
+                                        // 数字人民币显示2张图
+                                        var hasImg = false;
+                                        if (item.code_image_url) {
+                                            imgHtml += '<img class="pay-img-preview" src="' + item.code_image_url + '" style="max-width:100px;max-height:100px;border-radius:4px;margin:0 5px;cursor:pointer;" title="编码图（点击放大）" /><br><span style="color:#999;font-size:12px;">编码图</span> ';
+                                            hasImg = true;
+                                        }
+                                        if (item.id_card_image) {
+                                            imgHtml += '<img class="pay-img-preview" src="' + item.id_card_image + '" style="max-width:100px;max-height:100px;border-radius:4px;margin:0 5px;cursor:pointer;" title="实名图（点击放大）" /><br><span style="color:#999;font-size:12px;">实名图</span>';
+                                            hasImg = true;
+                                        }
+                                        if (!hasImg) imgHtml += '<span style="color:#999;">暂无图片</span>';
+                                    } else {
+                                        // 微信/支付宝/QQ 显示收款码
+                                        if (item.qrcode_url) {
+                                            var qrLabel = item.type === 'wechat' ? '微信收款码' : (item.type === 'alipay' ? '支付宝收款码' : (item.type === 'qq' ? 'QQ收款码' : '收款码'));
+                                            imgHtml += '<img class="pay-img-preview" src="' + item.qrcode_url + '" style="max-width:150px;max-height:150px;border-radius:4px;cursor:pointer;" title="' + qrLabel + '（点击放大）" /><div style="color:#999;font-size:12px;">' + qrLabel + '</div>';
+                                        } else {
+                                            imgHtml += '<span style="color:#999;">暂无图片</span>';
+                                        }
+                                    }
+                                    imgHtml += '</td></tr>';
+                                    html += imgHtml;
+                                }
+                            }
+                            html += '</tbody></table>';
+                        }
+                        html += '</div>';
+                        document.getElementById('payLoad').innerHTML = html;
+                        // 绑定图片点击放大
+                        var previewImgs = document.querySelectorAll('.pay-img-preview');
+                        for (var p = 0; p < previewImgs.length; p++) {
+                            previewImgs[p].onclick = function() {
+                                var imgSrc = this.src;
+                                var imgAlt = this.title || '预览';
+                                layer.photos({photos: {data: [{alt: imgAlt, src: imgSrc}]}, anim: 5});
+                            };
+                        }
+                    }).catch(function() {
+                        document.getElementById('payLoad').innerHTML = '<span style="color:red;">请求失败</span>';
+                    });
+                }
+            });
+        }
+
+        if (obj.event === 'setting') {
+            var html = '<div style="padding:20px;">';
+            html += '<div class="layui-form-item"><label class="layui-form-label">用户名</label><div class="layui-input-block"><input type="text" value="' + (data.username||'') + '" class="layui-input" disabled></div></div>';
+            html += '<div class="layui-form-item"><label class="layui-form-label">账户状态</label><div class="layui-input-block">';
+            if (data.status == 1) {
+                html += '<span class="layui-badge layui-bg-green">正常</span> ';
+                html += '<button type="button" class="layui-btn layui-btn-xs layui-btn-danger" id="dlgLock">锁定账户</button>';
+            } else {
+                html += '<span class="layui-badge">已锁定</span> ';
+                html += '<button type="button" class="layui-btn layui-btn-xs layui-btn-normal" id="dlgUnlock">解锁账户</button>';
+            }
+            html += '</div></div><hr>';
+            html += '<div class="layui-form-item"><label class="layui-form-label">新密码</label><div class="layui-input-block"><input type="text" id="dlgNewPwd" placeholder="输入新密码" class="layui-input"></div></div>';
+            html += '<div class="layui-form-item"><div class="layui-input-block"><button type="button" class="layui-btn" id="dlgChangePwd">修改密码</button></div></div>';
+            html += '</div>';
+
+            layer.open({type: 1, title: '用户设置 - ' + data.username, area: ['460px', '380px'], content: html, success: function(layero) {
+                var lockBtn = layero.find('#dlgLock')[0];
+                var unlockBtn = layero.find('#dlgUnlock')[0];
+                var pwdBtn = layero.find('#dlgChangePwd')[0];
+
+                if (lockBtn) lockBtn.onclick = function() {
+                    postJSON('/index/adminUserDisable', {id: data.id}).then(function(res) {
+                        if (res.code === 0) { layer.msg(res.msg); layer.closeAll(); table.reload('userTable'); }
+                        else layer.msg(res.msg || '操作失败');
+                    }).catch(function() { layer.msg('演示系统不要禁止演示数据'); });
+                };
+                if (unlockBtn) unlockBtn.onclick = function() {
+                    postJSON('/index/adminUserEnable', {id: data.id}).then(function(res) {
+                        if (res.code === 0) { layer.msg(res.msg); layer.closeAll(); table.reload('userTable'); }
+                        else layer.msg(res.msg || '操作失败');
+                    }).catch(function() { layer.msg('演示系统不要修改演示数据'); });
+                };
+                if (pwdBtn) pwdBtn.onclick = function() {
+                    var newPwd = layero.find('#dlgNewPwd')[0].value.trim();
+                    if (!newPwd) { layer.msg('请输入新密码'); return; }
+                    if (newPwd.length < 6) { layer.msg('密码至少6位'); return; }
+                    postJSON('/index/adminUserResetPassword', {id: data.id, new_password: newPwd}).then(function(res) {
+                        if (res.code === 0) { layer.msg(res.msg); layer.closeAll(); }
+                        else layer.msg(res.msg || '修改失败');
+                    }).catch(function() { layer.msg('不要修改演示数据中的会员密码，你修改后其他人就没有办法看了'); });
+                };
+            }});
+        }
+
+        if (obj.event === 'adjust') {
+            var html = '<div style="padding:20px;"><div class="layui-form">';
+            
+            html += '<img  src="/img/1.jpg" >';
+            html += '<div class="layui-form-item"><div class="layui-input-block"><button type="button" class="layui-btn" id="dlgSubmitAdjust">体验系统不具备该功能</button></div></div>';
+            html += '</div></div>';
+
+            layer.open({type: 1, title: '调整余额（体验系统不可用） - ' + data.username, area: ['460px', '500px'], content: html, success: function(layero) {
+                form.render('radio');
+                var btn = layero.find('#dlgSubmitAdjust')[0];
+                btn.onclick = function() {
+                    var amt = parseFloat(layero.find('#dlgAdjustAmt')[0].value);
+                    if (!amt || amt <= 0) { layer.msg('请输入有效金额'); return; }
+                    var atype = layero.find('input[name=atype]:checked')[0].value;
+                    var acttype = layero.find('input[name=acttype]:checked')[0].value;
+                    var finalAmount = acttype === 'sub' ? -amt : amt;
+                    postJSON('/index/adminUserAdjustBalance', {id: data.id, amount: finalAmount, type: atype}).then(function(res) {
+                        if (res.code === 0) { layer.msg(res.msg); layer.closeAll(); table.reload('userTable'); }
+                        else layer.msg(res.msg || '操作失败');
+                    }).catch(function() { layer.msg('请求失败'); });
+                };
+            }});
+        }
+
+        // 发信弹窗
+        if (obj.event === 'sendMsg') {
+            var html = '<div style="padding:20px;">';
+            html += '<div class="layui-form-item"><label class="layui-form-label">收信人</label><div class="layui-input-block"><input type="text" value="' + (data.username||('用户'+data.id)) + '" class="layui-input" disabled></div></div>';
+            html += '<div class="layui-form-item"><label class="layui-form-label">标题</label><div class="layui-input-block"><input type="text" id="msgTitle" placeholder="消息标题" class="layui-input"></div></div>';
+            html += '<div class="layui-form-item"><label class="layui-form-label">内容</label><div class="layui-input-block"><textarea id="msgContent" placeholder="消息内容" class="layui-textarea" style="height:120px;"></textarea></div></div>';
+            html += '<div class="layui-form-item"><div class="layui-input-block"><button type="button" class="layui-btn" id="dlgSendMsg">发送站内信</button></div></div>';
+            html += '</div>';
+
+            layer.open({type: 1, title: '发送站内信 - ' + (data.username||('用户'+data.id)), area: ['460px', '380px'], content: html, success: function(layero) {
+                var sendBtn = layero.find('#dlgSendMsg')[0];
+                sendBtn.onclick = function() {
+                    var title = layero.find('#msgTitle')[0].value.trim();
+                    var msgContent = layero.find('#msgContent')[0].value.trim();
+                    if (!title) { layer.msg('请输入标题'); return; }
+                    if (!msgContent) { layer.msg('请输入内容'); return; }
+                    sendBtn.disabled = true;
+                    sendBtn.innerText = '发送中...';
+                    postJSON('/index/adminUserSendMessage', {user_id: data.id, title: title, content: msgContent}).then(function(res) {
+                        if (res.code === 0) { layer.msg('发送成功'); layer.closeAll(); }
+                        else { layer.msg(res.msg || '发送失败'); sendBtn.disabled = false; sendBtn.innerText = '发送站内信'; }
+                    }).catch(function() { layer.msg('对不起为，演示系统不能提交任何数据'); sendBtn.disabled = false; sendBtn.innerText = '发送站内信'; });
+                };
+            }});
+        }
+    });
+
+    // 搜索
+    document.getElementById('btnSearch').onclick = function() {
+        var keyword = document.getElementById('searchKeyword').value.trim();
+        var status = document.getElementById('searchStatus').value;
+        var role = document.getElementById('searchRole').value;
+        table.reload('userTable', {where: {keyword: keyword, status: status, role: role}, page: {curr: 1}});
+    };
+
+    // 重置
+    document.getElementById('btnReset').onclick = function() {
+        document.getElementById('searchKeyword').value = '';
+        document.getElementById('searchStatus').value = '';
+        document.getElementById('searchRole').value = '';
+        table.reload('userTable', {where: {keyword: '', status: '', role: ''}, page: {curr: 1}});
+    };
+
+    // 刷新
+    document.getElementById('btnReload').onclick = function() {
+        table.reload('userTable');
+    };
+    //添加用户
+    document.getElementById('btnAddUser').onclick = function() {
+        var html = '<div style="padding:20px;">';
+        html += '<div class="layui-form-item"><label class="layui-form-label">用户名</label><div class="layui-input-block"><input type="text" id="addUsername" placeholder="3-20位字母数字下划线" class="layui-input"></div></div>';
+        html += '<div class="layui-form-item"><label class="layui-form-label">密码</label><div class="layui-input-block"><input type="text" id="addPassword" placeholder="至少6位" class="layui-input"></div></div>';
+        html += '<div class="layui-form-item"><label class="layui-form-label">手机号</label><div class="layui-input-block"><input type="text" id="addPhone" placeholder="选填" class="layui-input"></div></div>';
+        html += '<div class="layui-form-item"><label class="layui-form-label">邮箱</label><div class="layui-input-block"><input type="text" id="addEmail" placeholder="选填" class="layui-input"></div></div>';
+        html += '<div class="layui-form-item"><label class="layui-form-label">昵称</label><div class="layui-input-block"><input type="text" id="addNickname" placeholder="选填" class="layui-input"></div></div>';
+        html += '<div style="padding:0 0 10px 110px;color:#999;font-size:12px;">手机号和邮箱至少填一个</div>';
+        html += '<div class="layui-form-item"><div class="layui-input-block"><button type="button" class="layui-btn" id="dlgSubmitAdd">确认创建</button></div></div>';
+        html += '</div>';
+
+        layer.open({type: 1, title: '添加用户', area: ['480px', '440px'], content: html, success: function(layero) {
+            var submitBtn = layero.find('#dlgSubmitAdd')[0];
+            submitBtn.onclick = function() {
+                var username = layero.find('#addUsername')[0].value.trim();
+                var password = layero.find('#addPassword')[0].value.trim();
+                var phone = layero.find('#addPhone')[0].value.trim();
+                var email = layero.find('#addEmail')[0].value.trim();
+                var nickname = layero.find('#addNickname')[0].value.trim();
+
+                if (!username) { layer.msg('请输入用户名'); return; }
+                if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) { layer.msg('用户名格式：3-20位字母数字下划线'); return; }
+                if (!password || password.length < 6) { layer.msg('密码至少6位'); return; }
+                if (!phone && !email) { layer.msg('手机号和邮箱至少填一个'); return; }
+
+                submitBtn.disabled = true;
+                submitBtn.innerText = '创建中...';
+                postJSON('/index/adminUserCreate', {
+                    username: username,
+                    password: password,
+                    phone: phone,
+                    email: email,
+                    nickname: nickname
+                }).then(function(res) {
+                    if (res.code === 0) {
+                        layer.msg('用户创建成功', {icon:1, time:1500}, function() {
+                            layer.closeAll();
+                            table.reload('userTable');
+                        });
+                    } else {
+                        layer.msg(res.msg || '创建失败', {icon:2});
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = '确认创建';
+                    }
+                }).catch(function() {
+                    layer.msg('请求失败', {icon:2});
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = '确认创建';
+                });
+            };
+        }});
+    };
+});
+</script>
+
+<script type="text/html" id="userToolbar">
+    <a class="layui-btn layui-btn-xs layui-btn-warm" lay-event="verify">认证</a>
+    <a class="layui-btn layui-btn-xs" lay-event="payment">收款</a>
+    <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="setting">设置</a>
+    <a class="layui-btn layui-btn-xs" lay-event="adjust">调整余额</a>
+    <a class="layui-btn layui-btn-xs" lay-event="sendMsg" style="background:#6c5ce7;color:#fff;">发信</a>
+</script>
+
+</body>
+</html>

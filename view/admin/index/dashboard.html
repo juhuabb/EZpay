@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>仪表盘</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>.c{background:#fff;border-radius:8px;padding:20px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.08);flex:1}.c .n{font-size:32px;font-weight:bold;color:#2979FF}.c .l{font-size:14px;color:#999;margin-top:8px}.r{display:flex;gap:20px;margin-bottom:20px}</style>
+</head><body style="padding:20px;background:#f5f6fa">
+<div class="r"><div class="c"><div class="n" id="a">-</div><div class="l">注册用户</div></div><div class="c"><div class="n" id="b">-</div><div class="l">认证商户</div></div><div class="c"><div class="n" id="c">-</div><div class="l">今日订单</div></div><div class="c"><div class="n" id="d">-</div><div class="l">今日交易</div></div></div>
+<img src="/img/5.jpg">
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>layui.use(function(){fetch('/index/adminDashboardStats',{headers:{'Authorization':'Bearer '+(localStorage.getItem('admin_token')||'')}}).then(function(r){return r.json()}).then(function(r){if(r.code===0){document.getElementById('a').textContent=r.data.users||0;document.getElementById('b').textContent=r.data.merchants||0;document.getElementById('c').textContent=r.data.today_orders||0;document.getElementById('d').textContent=r.data.today_transactions||0}})});</script>
+</body></html>

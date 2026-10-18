@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认证审核详情 - 积分管理系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@3.1.1/dist/css/layui.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; }
+        .content-card {
+            background: #fff; border-radius: 6px; padding: 24px 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 20px;
+        }
+        .content-card .card-title {
+            font-size: 16px; font-weight: 600; color: #333;
+            margin-bottom: 16px; padding-bottom: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .content-card .card-title i { color: #2979FF; margin-right: 6px; }
+        .detail-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 30px; }
+        .detail-info .info-item { display: flex; padding: 8px 0; border-bottom: 1px dashed #f0f0f0; }
+        .detail-info .info-label { color: #999; width: 110px; flex-shrink: 0; }
+        .detail-info .info-value { color: #333; flex: 1; word-break: break-all; }
+        .photo-area { margin-top: 16px; }
+        .photo-area img {
+            max-width: 300px; max-height: 200px; border-radius: 6px;
+            border: 1px solid #eee; margin-right: 16px; margin-bottom: 10px;
+        }
+        .review-actions { margin-top: 24px; }
+    </style>
+</head>
+<body>
+    <div class="content-card">
+        <div class="card-title"><i class="layui-icon layui-icon-ok-circle"></i>实名认证信息</div>
+        <div class="detail-info" id="verifyInfo">
+            <div style="text-align:center;color:#999;padding:20px;grid-column:1/-1;">加载中...</div>
+        </div>
+    </div>
+
+    <div class="content-card" id="photoCard" style="display:none;">
+        <div class="card-title"><i class="layui-icon layui-icon-picture"></i>证件照片</div>
+        <div class="photo-area" id="photoArea"></div>
+    </div>
+
+    <div class="content-card" id="reviewCard">
+        <div class="card-title"><i class="layui-icon layui-icon-edit"></i>审核操作</div>
+        <div class="review-actions" id="reviewActions">
+            <button class="layui-btn" id="btnApprove" style="background:#67c23a;">
+                <i class="layui-icon layui-icon-ok"></i> 审核通过
+            </button>
+            <button class="layui-btn layui-btn-danger" id="btnReject" style="margin-left:10px;">
+                <i class="layui-icon layui-icon-close"></i> 审核拒绝
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/layui@3.1.1/dist/layui.js"></script>
+    <script>
+        var __apiToken = '';
+        window.addEventListener('message', function(e) { if (e.data && e.data.type === 'setToken') __apiToken = e.data.token; });
+
+        layui.use(['layer'], function() {
+            var layer = layui.layer;
+            var $ = layui.$;
+            var verifyId = {$verifyId};
+
+            function getAuthHeaders() {
+                return { 'Authorization': 'Bearer ' + __apiToken };
+            }
+
+            // 加载认证信息
+            $.ajax({
+                url: '/admin/verify/real-name?page=1&page_size=100',
+                headers: getAuthHeaders(),
+                success: function(res) {
+                    if (res.code === 0 && res.data && res.data.list) {
+                        var item = res.data.list.find(function(v) { return v.id == verifyId; });
+                        if (item) {
+                            renderVerify(item);
+                        } else {
+                            $('#verifyInfo').html('<div style="text-align:center;color:#999;padding:20px;grid-column:1/-1;">未找到认证记录</div>');
+                        }
+                    }
+                }
+            });
+
+            function renderVerify(item) {
+                var statusText = '';
+                if (item.status === 0) statusText = '<span class="layui-badge layui-bg-orange">待审核</span>';
+                else if (item.status === 1) statusText = '<span class="layui-badge layui-bg-green">已通过</span>';
+                else statusText = '<span class="layui-badge">已拒绝</span>';
+
+                var html = '' +
+                    '<div class="info-item"><div class="info-label">认证ID</div><div class="info-value">' + item.id + '</div></div>' +
+                    '<div class="info-item"><div class="info-label">用户</div><div class="info-value">' + (item.user ? item.user.username : '-') + '</div></div>' +
+                    '<div class="info-item"><div class="info-label">手机号</div><div class="info-value">' + (item.user ? item.user.phone : '-') + '</div></div>' +
+                    '<div class="info-item"><div class="info-label">真实姓名</div><div class="info-value">' + (item.real_name||'-') + '</div></div>' +
+                    '<div class="info-item"><div class="info-label">身份证号</div><div class="info-value">' + (item.id_card||'-') + '</div></div>' +
+                    '<div class="info-item"><div class="info-label">状态</div><div class="info-value">' + statusText + '</div></div>' +
+                    '<div class="info-item"><div class="info-label">提交时间</div><div class="info-value">' + (item.created_at||'-') + '</div></div>' +
+                    '<div class="info-item"><div class="info-label">审核时间</div><div class="info-value">' + (item.verified_at||'-') + '</div></div>';
+                $('#verifyInfo').html(html);
+
+                // 照片
+                if (item.id_card_front || item.id_card_back) {
+                    $('#photoCard').show();
+                    var photos = '';
+                    if (item.id_card_front) photos += '<div style="margin-bottom:10px;"><p style="margin-bottom:6px;color:#666;font-size:13px;">身份证正面</p><img src="' + item.id_card_front + '"></div>';
+                    if (item.id_card_back) photos += '<div><p style="margin-bottom:6px;color:#666;font-size:13px;">身份证背面</p><img src="' + item.id_card_back + '"></div>';
+                    $('#photoArea').html(photos);
+                }
+
+                // 非待审核状态隐藏操作按钮
+                if (item.status !== 0) {
+                    $('#reviewCard').html('<div class="card-title"><i class="layui-icon layui-icon-ok-circle"></i>审核状态</div><p style="color:#999;">该认证已审核完成</p>');
+                }
+            }
+
+            // 审核通过
+            $('#btnApprove').on('click', function() {
+                layer.confirm('确认通过该实名认证？', function(index) {
+                    $.ajax({
+                        url: '/admin/verify/real-name/' + verifyId + '/review',
+                        type: 'POST',
+                        headers: getAuthHeaders(),
+                        contentType: 'application/json',
+                        data: JSON.stringify({ status: 1 }),
+                        success: function(res) {
+                            if (res.code === 0) {
+                                layer.msg('审核通过', {icon: 1});
+                                setTimeout(function() { location.reload(); }, 1000);
+                            } else {
+                                layer.msg(res.msg, {icon: 2});
+                            }
+                        }
+                    });
+                    layer.close(index);
+                });
+            });
+
+            // 审核拒绝
+            $('#btnReject').on('click', function() {
+                layer.confirm('确认拒绝该实名认证？', function(index) {
+                    $.ajax({
+                        url: '/admin/verify/real-name/' + verifyId + '/review',
+                        type: 'POST',
+                        headers: getAuthHeaders(),
+                        contentType: 'application/json',
+                        data: JSON.stringify({ status: 2 }),
+                        success: function(res) {
+                            if (res.code === 0) {
+                                layer.msg('已拒绝', {icon: 1});
+                                setTimeout(function() { location.reload(); }, 1000);
+                            } else {
+                                layer.msg(res.msg, {icon: 2});
+                            }
+                        }
+                    });
+                    layer.close(index);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

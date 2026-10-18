@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{$title|default='积分管理系统'}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@3.1.1/dist/css/layui.css">
+    <style>
+        :root {
+            --primary-color: #2979FF;
+            --sidebar-bg: #304156;
+            --sidebar-text: #bfcbd9;
+            --sidebar-active: #ffffff;
+            --header-height: 50px;
+            --sidebar-width: 220px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f0f2f5; }
+        
+        /* 侧边栏 */
+        .admin-sidebar {
+            position: fixed; left: 0; top: 0; bottom: 0;
+            width: var(--sidebar-width);
+            background: var(--sidebar-bg);
+            color: var(--sidebar-text);
+            overflow-y: auto;
+            z-index: 1000;
+            transition: width 0.3s;
+        }
+        .admin-sidebar .logo {
+            height: var(--header-height);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 16px; font-weight: 700;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .admin-sidebar .logo i { margin-right: 8px; font-size: 22px; }
+        .admin-sidebar .layui-nav { background: none; padding: 0; }
+        .admin-sidebar .layui-nav .layui-nav-item a {
+            color: var(--sidebar-text); padding: 0 20px; height: 44px; line-height: 44px;
+        }
+        .admin-sidebar .layui-nav .layui-nav-item a:hover,
+        .admin-sidebar .layui-nav .layui-this a { color: var(--sidebar-active); background: rgba(255,255,255,0.05); }
+        .admin-sidebar .layui-nav .layui-nav-item a i { margin-right: 10px; font-size: 17px; }
+        .admin-sidebar .layui-nav-child { background: #263445; }
+        .admin-sidebar .layui-nav-child dd a { padding-left: 50px !important; }
+        .admin-sidebar .layui-nav .layui-nav-more { border-top-color: var(--sidebar-text); }
+        .admin-sidebar .layui-nav .layui-nav-mored { border-color: transparent; border-bottom-color: var(--sidebar-text); }
+
+        /* 顶部栏 */
+        .admin-header {
+            position: fixed; top: 0; left: var(--sidebar-width); right: 0;
+            height: var(--header-height);
+            background: #fff; box-shadow: 0 1px 4px rgba(0,21,41,0.08);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 20px; z-index: 999;
+        }
+        .admin-header .header-left { display: flex; align-items: center; }
+        .admin-header .header-right { display: flex; align-items: center; gap: 15px; }
+        .admin-header .header-right a { color: #333; }
+
+        /* 内容区 */
+        .admin-content {
+            margin-left: var(--sidebar-width);
+            margin-top: var(--header-height);
+            padding: 20px;
+            min-height: calc(100vh - var(--header-height));
+        }
+        .admin-content iframe {
+            width: 100%; height: calc(100vh - var(--header-height) - 40px);
+            border: none; background: #fff; border-radius: 4px;
+        }
+
+        /* 统计卡片 */
+        .stat-card {
+            background: #fff; border-radius: 6px; padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .stat-card .stat-value { font-size: 28px; font-weight: 700; color: #333; }
+        .stat-card .stat-label { font-size: 14px; color: #999; margin-top: 6px; }
+        .stat-card .stat-icon { font-size: 40px; opacity: 0.15; position: absolute; right: 20px; top: 20px; }
+        .stat-card { position: relative; overflow: hidden; }
+
+        /* 内容卡片 */
+        .content-card {
+            background: #fff; border-radius: 6px; padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 20px;
+        }
+        .content-card .card-title {
+            font-size: 16px; font-weight: 600; color: #333;
+            margin-bottom: 16px; padding-bottom: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        /* 主色按钮 */
+        .layui-btn-primary { background-color: var(--primary-color); color: #fff; border: none; }
+        .layui-btn-primary:hover { color: #fff; opacity: 0.85; }
+
+        /* 详情页 */
+        .detail-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 30px; }
+        .detail-info .info-item { display: flex; padding: 8px 0; border-bottom: 1px dashed #f0f0f0; }
+        .detail-info .info-label { color: #999; width: 100px; flex-shrink: 0; }
+        .detail-info .info-value { color: #333; flex: 1; word-break: break-all; }
+
+        /* 时间线 */
+        .timeline { position: relative; padding-left: 30px; }
+        .timeline::before { content: ''; position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: #e8e8e8; }
+        .timeline-item { position: relative; padding-bottom: 20px; }
+        .timeline-item::before {
+            content: ''; position: absolute; left: -24px; top: 4px;
+            width: 10px; height: 10px; border-radius: 50%;
+            background: var(--primary-color); border: 2px solid #fff;
+            box-shadow: 0 0 0 2px var(--primary-color);
+        }
+        .timeline-item .time { color: #999; font-size: 12px; }
+        .timeline-item .desc { color: #333; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    {block name="body"}{/block}
+    <script src="https://cdn.jsdelivr.net/npm/layui@3.1.1/dist/layui.js"></script>
+    {block name="script"}{/block}
+</body>
+</html>

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>后台管理</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>body{margin:0}.layui-layout-admin .layui-body{top:50px;bottom:0}.layui-layout-admin .layui-footer{height:0}.ifr{width:100%;height:100%;border:none}.layui-nav-tree .layui-nav-item{position:relative}.layui-nav-tree .layui-nav-child dd{position:relative}.bell-wrap{position:relative;display:inline-flex;align-items:center;cursor:pointer;padding:0 15px;font-size:20px;color:#fff}.bell-badge{position:absolute;top:2px;right:4px;background:#ff5722;color:#fff;border-radius:10px;padding:0 5px;font-size:11px;line-height:16px;min-width:16px;text-align:center;display:none}.bell-badge.show{display:block;animation:bellShake 0.5s ease}@keyframes bellShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}</style>
+</head>
+<body class="layui-layout layui-layout-admin">
+<div class="layui-header">
+<ul class="layui-nav layui-layout-left"><li class="layui-nav-item"><a href="/index/homePanel9x">后台管理</a></li><li class="layui-nav-item"><a href="javascript:;" id="btnClearRecords" style="color:#FF5722;">清空记录</a></li></ul>
+<ul class="layui-nav layui-layout-right">
+<li class="layui-nav-item"><span class="bell-wrap" id="topChat" title="客服待处理">🎧<span class="bell-badge" id="chatBadge">0</span></span></li>
+<li class="layui-nav-item"><span class="bell-wrap" id="topComplaint" title="待处理申诉">📋<span class="bell-badge" id="complaintBadge">0</span></span></li>
+<li class="layui-nav-item"><span class="bell-wrap" id="topMessage" title="待处理留言">💬<span class="bell-badge" id="messageBadge">0</span></span></li>
+<li class="layui-nav-item"><span class="bell-wrap" id="topBell" title="待审核实名认证">🔔<span class="bell-badge" id="bellBadge">0</span></span></li>
+<li class="layui-nav-item"><a href="/index/adminLogout">退出</a></li>
+</ul>
+</div>
+<div class="layui-side layui-bg-black"><div class="layui-side-scroll">
+<ul class="layui-nav layui-nav-tree">
+<li class="layui-nav-item layui-this"><a data-u="/index/adminDashboard">仪表盘</a></li>
+<li class="layui-nav-item"><a data-u="/index/adminUserList">用户管理</a></li>
+<li class="layui-nav-item"><a data-u="/index/adminVerifyList">认证审核</a></li>
+<li class="layui-nav-item"><a href="javascript:;">API商户</a><dl class="layui-nav-child"><dd><a data-u="/index/adminMerchantList">商户管理</a></dd><dd><a data-u="/index/adminPaymentOrderList">支付管理</a></dd><dd><a data-u="/index/adminMerchantLogs">请求记录</a></dd></dl></li>
+
+<li class="layui-nav-item"><a data-u="/index/adminRechargeList">充值订单</a></li><li class="layui-nav-item"><a href="javascript:;">积分宝管理</a><dl class="layui-nav-child"><dd><a data-u="/index/adminSavingsProjectPublish">项目发布</a></dd><dd><a data-u="/index/adminSavingsProjectList">项目管理</a></dd><dd><a data-u="/index/adminSavingsOrders">成交记录</a></dd></dl></li>
+<li class="layui-nav-item"><a data-u="/index/adminOrderList">订单管理</a></li>
+<li class="layui-nav-item"><a data-u="/index/adminTransactionList">交易记录</a></li>
+<li class="layui-nav-item"><a data-u="/index/adminDisputeList">争议管理</a></li>
+<li class="layui-nav-item"><a data-u="/index/adminSystemSettings">系统设置</a></li>
+<li class="layui-nav-item"><a data-u="/index/adminTradeSettings">交易设置</a></li>
+<li class="layui-nav-item"><a href="javascript:;">消息管理</a><dl class="layui-nav-child"><dd><a data-u="/index/adminComplaintList">投诉管理</a></dd><dd><a data-u="/index/adminMessageList">站内信</a></dd><dd><a data-u="/index/adminBroadcastList">群发广播</a></dd><dd><a data-u="/index/adminCustomerMessageList">客户留言</a></dd></dl></li>
+<li class="layui-nav-item"><a data-u="/index/adminChatList">在线客服</a></li>
+<li class="layui-nav-item"><a data-u="/index/adminBannerList">广告管理</a></li>
+<li class="layui-nav-item"><a data-u="/index/adminContentList">内容管理</a></li>
+<li class="layui-nav-item"><a data-u="/index/adminGameList">游戏管理</a></li>
+<li class="layui-nav-item"><a data-u="/index/adminAppVersionList">APP更新</a></li>
+<li class="layui-nav-item"><a data-u="/index/adminSettings">管理员设置</a></li>
+</ul>
+</div></div>
+<div class="layui-body"><iframe class="ifr" id="mf" src="/index/adminDashboard"></iframe></div>
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+layui.use(['element','jquery'],function(){
+    $=layui.jquery;
+
+    $('.layui-nav-tree a[data-u]').on('click',function(){
+        var url=$(this).data('u');
+        $('#mf').attr('src',url);
+        if(url.indexOf('adminChat')!==-1){ stopChatBeep(); }
+    });
+
+    // 清空记录
+    $('#btnClearRecords').on('click',function(){
+        $('#mf').attr('src','/index/adminClearRecords');
+    });
+
+    // ========== 通用音频上下文 ==========
+    var audioCtx = null;
+
+    // ========== 待审核实名认证提示 ==========
+    var beepTimer = null;
+    var lastCount = 0;
+
+    function playBeep(){
+        try{
+            if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+            var osc = audioCtx.createOscillator();
+            var gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.frequency.setValueAtTime(660, audioCtx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.4);
+        }catch(e){}
+    }
+
+    function startBeep(){
+        if(beepTimer) return;
+        playBeep();
+        beepTimer = setInterval(playBeep, 8000);
+    }
+
+    function stopBeep(){
+        if(beepTimer){ clearInterval(beepTimer); beepTimer = null; }
+    }
+
+    function updateBadge(count){
+        var $navItem = $('.layui-nav-tree a[data-u="/index/adminVerifyList"]').closest('li');
+        $navItem.find('.verify-badge').remove();
+        if(count > 0){
+            $navItem.append('<span class="verify-badge" style="position:absolute;top:8px;right:8px;background:#ff5722;color:#fff;border-radius:10px;padding:0 5px;font-size:11px;line-height:18px;min-width:18px;text-align:center;z-index:999;">'+count+'</span>');
+        }
+        var $bell = $('#bellBadge');
+        $bell.text(count > 99 ? '99+' : count);
+        if(count > 0){ $bell.addClass('show'); } else { $bell.removeClass('show'); }
+    }
+
+    $('#topBell').on('click', function(){
+        $('#mf').attr('src', '/index/adminVerifyList');
+    });
+
+    $('#topComplaint').on('click', function(){
+        $('#mf').attr('src', '/index/adminComplaintList');
+    });
+
+    $('#topMessage').on('click', function(){
+        $('#mf').attr('src', '/index/adminCustomerMessageList');
+    });
+
+    // ========== 申诉 & 留言待处理提示 ==========
+    function updateNotifyBadge(id, count){
+        var $b = $(id);
+        $b.text(count > 99 ? '99+' : count);
+        if(count > 0){ $b.addClass('show'); } else { $b.removeClass('show'); }
+    }
+
+    function updateSidebarBadge(menuUrl, count){
+        var $a = $('.layui-nav-tree a[data-u="'+menuUrl+'"]');
+        var $parent = $a.closest('dd');
+        if($parent.length === 0){ $parent = $a.closest('li'); }
+        $parent.find('.side-badge').remove();
+        if(count > 0){
+            $parent.append('<span class="side-badge" style="position:absolute;top:8px;right:8px;background:#ff5722;color:#fff;border-radius:10px;padding:0 5px;font-size:11px;line-height:18px;min-width:18px;text-align:center;z-index:999;">'+count+'</span>');
+        }
+    }
+
+    function checkPendingNotify(){
+        fetch('/index/adminPendingNotifyCount',{headers:{'X-Requested-With':'XMLHttpRequest'}})
+            .then(function(r){return r.json();})
+            .then(function(res){
+                var d = (res && res.data) ? res.data : {};
+                var cc = d.complaint_count || 0;
+                var mc = d.message_count || 0;
+                updateNotifyBadge('#complaintBadge', cc);
+                updateNotifyBadge('#messageBadge', mc);
+                updateSidebarBadge('/index/adminComplaintList', cc);
+                updateSidebarBadge('/index/adminCustomerMessageList', mc);
+            })
+            .catch(function(){});
+    }
+
+    checkPendingNotify();
+    setInterval(checkPendingNotify, 30000);
+
+    function checkPending(){
+        fetch('/index/adminPendingVerifyCount',{headers:{'X-Requested-With':'XMLHttpRequest'}})
+            .then(function(r){return r.json();})
+            .then(function(res){
+                var count = (res && res.data) ? res.data.count : 0;
+                updateBadge(count);
+                if(count > 0){
+                    if(lastCount === 0){
+                        startBeep();
+                    }
+                }else{
+                    stopBeep();
+                }
+                lastCount = count;
+            })
+            .catch(function(){});
+    }
+
+    checkPending();
+    setInterval(checkPending, 30000);
+
+    // ========== 客服待处理提示（持续提示音直到处理） ==========
+    var chatBeepTimer = null;
+
+    function playChatBeep(){
+        try{
+            if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+            var osc = audioCtx.createOscillator();
+            var gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(1046, audioCtx.currentTime);
+            osc.frequency.setValueAtTime(784, audioCtx.currentTime + 0.1);
+            osc.frequency.setValueAtTime(1046, audioCtx.currentTime + 0.2);
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.5);
+        }catch(e){}
+    }
+
+    function startChatBeep(){
+        if(chatBeepTimer) return;
+        playChatBeep();
+        chatBeepTimer = setInterval(playChatBeep, 3000);
+    }
+
+    function stopChatBeep(){
+        if(chatBeepTimer){ clearInterval(chatBeepTimer); chatBeepTimer = null; }
+    }
+
+    function isOnChatPage(){
+        var src = $('#mf').attr('src') || '';
+        return src.indexOf('adminChat') !== -1;
+    }
+
+    function checkChatNotify(){
+        fetch('/index/adminChatNotifyCount',{headers:{'X-Requested-With':'XMLHttpRequest'}})
+            .then(function(r){return r.json();})
+            .then(function(res){
+                var d = (res && res.data) ? res.data : {};
+                var total = d.total || 0;
+                var $badge = $('#chatBadge');
+                $badge.text(total > 99 ? '99+' : total);
+                if(total > 0){
+                    $badge.addClass('show');
+                    updateSidebarBadge('/index/adminChatList', total);
+                    if(!isOnChatPage()){
+                        startChatBeep();
+                    } else {
+                        stopChatBeep();
+                    }
+                } else {
+                    $badge.removeClass('show');
+                    updateSidebarBadge('/index/adminChatList', 0);
+                    stopChatBeep();
+                }
+            })
+            .catch(function(){});
+    }
+
+    $('#topChat').on('click', function(){
+        stopChatBeep();
+        $('#mf').attr('src', '/index/adminChatList');
+    });
+
+    checkChatNotify();
+    setInterval(checkChatNotify, 10000);
+
+    // ========== 解锁音频播放 ==========
+    document.addEventListener('click', function unlockAudio(){
+        if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        document.removeEventListener('click', unlockAudio);
+    }, {once:true});
+});
+</script>
+</body>
+</html>

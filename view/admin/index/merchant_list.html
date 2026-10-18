@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>商户管理</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+.toggle-btn { cursor: pointer; }
+</style>
+</head><body style="padding:20px;background:#f5f6fa">
+<div style="background:#fff;padding:20px;border-radius:8px">
+<h3 style="margin-bottom:15px">商户管理</h3>
+<table class="layui-table" id="t"></table>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+layui.use(['table','layer'], function(){
+  var table = layui.table;
+  var layer = layui.layer;
+
+  table.render({
+    elem: '#t',
+    url: '/index/adminMerchantListData',
+    headers: {'Authorization': 'Bearer ' + (localStorage.getItem('admin_token') || '')},
+    parseData: function(r){
+      return {code: r.code===0?0:1, data: r.data.list||[], count: r.data.total||0}
+    },
+    page: true,
+    limit: 10,
+    cols: [[
+      {field:'id', title:'ID', width:70},
+      {field:'user_id', title:'用户ID', width:80},
+      {field:'website_url', title:'网站URL', width:200},
+      {field:'server_ip', title:'服务器IP', width:150},
+      {field:'company_name', title:'企业名称', width:180},
+      {field:'status', title:'审核状态', width:100, templet:function(d){
+        if(d.status===1) return '<span style="color:green;font-weight:bold">已通过</span>';
+        if(d.status===2) return '<span style="color:orange;font-weight:bold">审核中</span>';
+        if(d.status===3) return '<span style="color:red;font-weight:bold">已拒绝</span>';
+        return '<span style="color:gray">未申请</span>';
+      }},
+      {field:'payment_enabled', title:'支付状态', width:100, templet:function(d){
+        if(d.status!==1) return '<span style="color:gray">-</span>';
+        if(d.payment_enabled==1) return '<span style="color:green;font-weight:bold">已启用</span>';
+        return '<span style="color:red;font-weight:bold">未启用</span>';
+      }},
+      {field:'payment_limit', title:'支付限额', width:100, templet:function(d){
+        return d.payment_limit ? parseFloat(d.payment_limit).toFixed(2) : '0.00';
+      }},
+      {field:'created_at', title:'申请时间', width:160},
+      {title:'操作', width:320, toolbar:'#actionBar'}
+    ]]
+  });
+
+  table.on('tool(t)', function(obj){
+    var data = obj.data;
+    if(obj.event === 'approve'){
+      layer.confirm('确认通过该商户认证？', function(index){
+        layer.close(index);
+        var token = localStorage.getItem('admin_token') || '';
+        fetch('/index/adminMerchantAudit', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+token},
+          body: JSON.stringify({id: data.id, action: 'approve'})
+        }).then(r=>r.json()).then(function(res){
+          if(res.code===0){ layer.msg('已通过'); table.reload('t'); }
+          else { layer.msg(res.msg || '体验系统不具备该功能操作'); }
+        });
+      });
+    } else if(obj.event === 'reject'){
+      layer.confirm('确认拒绝该商户认证？', function(index){
+        layer.close(index);
+        var token = localStorage.getItem('admin_token') || '';
+        fetch('/index/adminMerchantAudit', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+token},
+          body: JSON.stringify({id: data.id, action: 'reject'})
+        }).then(r=>r.json()).then(function(res){
+          if(res.code===0){ layer.msg('已拒绝'); table.reload('t'); }
+          else { layer.msg(res.msg || '体验系统不具备该功能操作'); }
+        });
+      });
+    } else if(obj.event === 'togglePayment'){
+      var action = data.payment_enabled==1 ? '关闭' : '开启';
+      layer.confirm('确认' + action + '该商户的支付功能？', function(index){
+        layer.close(index);
+        var token = localStorage.getItem('admin_token') || '';
+        fetch('/index/adminTogglePayment', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+token},
+          body: JSON.stringify({id: data.id})
+        }).then(r=>r.json()).then(function(res){
+          if(res.code===0){ layer.msg(res.msg); table.reload('t'); }
+          else { layer.msg(res.msg || '体验系统不具备该功能操作'); }
+        });
+      });
+    } else if(obj.event === 'setLimit'){
+      var currentLimit = data.payment_limit || 0;
+      layer.prompt({
+        title: '设置单笔支付限额（0=不限）',
+        value: parseFloat(currentLimit).toString(),
+        formType: 0
+      }, function(val, index){
+        layer.close(index);
+        var token = localStorage.getItem('admin_token') || '';
+        fetch('/index/adminSetPaymentLimit', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+token},
+          body: JSON.stringify({id: data.id, payment_limit: parseFloat(val) || 0})
+        }).then(r=>r.json()).then(function(res){
+          if(res.code===0){ layer.msg('限额已设置'); table.reload('t'); }
+          else { layer.msg(res.msg || 'adminSetPaymentLimit'); }
+        });
+      });
+    } else if(obj.event === 'edit'){
+      layer.open({
+        title: '修改商户信息',
+        type: 1,
+        area: ['420px', '340px'],
+        content: '<form style="padding:20px 20px 0">' +
+          '<div class="layui-form-item">' +
+            '<label class="layui-form-label">商户名称</label>' +
+            '<div class="layui-input-block">' +
+              '<input type="text" id="editCompanyName" class="layui-input" value="' + (data.company_name || '') + '" />' +
+            '</div>' +
+          '</div>' +
+          '<div class="layui-form-item" style="margin-top:15px">' +
+            '<label class="layui-form-label">网站地址</label>' +
+            '<div class="layui-input-block">' +
+              '<input type="text" id="editWebsiteUrl" class="layui-input" value="' + (data.website_url || '') + '" />' +
+            '</div>' +
+          '</div>' +
+          '<div class="layui-form-item" style="margin-top:15px">' +
+          '<label class="layui-form-label">服务器IP</label>' +
+          '<div class="layui-input-block">' +
+          '<input type="text" id="editServerIp" class="layui-input" value="' + (data.server_ip || '') + '" placeholder="多个IP用逗号分隔" />' +
+          '</div>' +
+          '</div>' +
+          '<div class="layui-form-item" style="margin-top:20px;text-align:center">' +
+            '<button type="button" id="editSaveBtn" class="layui-btn" style="margin-right:10px">保存</button>' +
+            '<button type="button" id="editCancelBtn" class="layui-btn layui-btn-primary">取消</button>' +
+          '</div>' +
+        '</form>',
+        success: function(){
+          var token = localStorage.getItem('admin_token') || '';
+          document.getElementById('editCancelBtn').onclick = function(){
+            layer.closeAll();
+          };
+          document.getElementById('editSaveBtn').onclick = function(){
+            var companyName = document.getElementById('editCompanyName').value.trim();
+            var websiteUrl = document.getElementById('editWebsiteUrl').value.trim();
+            var serverIp = document.getElementById('editServerIp').value.trim();
+            if(!websiteUrl){
+              layer.msg('请输入网站地址', {icon: 0});
+              return;
+            }
+            var btn = this;
+            btn.disabled = true;
+            btn.innerText = '保存中...';
+            fetch('/index/adminMerchantEdit', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+token},
+              body: JSON.stringify({id: data.id, company_name: companyName, website_url: websiteUrl, server_ip: serverIp})
+            }).then(r=>r.json()).then(function(res){
+              if(res.code===0){ layer.msg('修改成功', {icon:1}); layer.closeAll(); table.reload('t'); }
+              else { layer.msg(res.msg || '修改失败', {icon:2}); btn.disabled = false; btn.innerText = '保存'; }
+            }).catch(function(){
+              layer.msg('体验系统不具备该功能', {icon:2}); btn.disabled = false; btn.innerText = '保存';
+            });
+          };
+        }
+      });
+    } else if(obj.event === 'delete'){
+      layer.confirm('确认删除该商户认证？删除后用户需要重新申请认证。', {icon:3, title:'删除确认'}, function(index){
+        layer.close(index);
+        var token = localStorage.getItem('admin_token') || '';
+        fetch('/index/adminMerchantDelete', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+token},
+          body: JSON.stringify({id: data.id})
+        }).then(r=>r.json()).then(function(res){
+          if(res.code===0){ layer.msg(res.msg, {icon:1}); table.reload('t'); }
+          else { layer.msg(res.msg || '操作失败', {icon:2}); }
+        }).catch(function(){
+          layer.msg('体验系统不具备该功能', {icon:2});
+        });
+      });
+    }
+  });
+});
+</script>
+
+<script type="text/html" id="actionBar">
+  {{# if(d.status===2){ }}
+  <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="approve">通过</a>
+  <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="reject">拒绝</a>
+  <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="delete" style="background-color:#FF5722">删除</a>
+  {{# } else if(d.status===1){ }}
+  {{# if(d.payment_enabled==1){ }}
+  <a class="layui-btn layui-btn-xs layui-btn-warm" lay-event="togglePayment">关闭支付</a>
+  {{# } else { }}
+  <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="togglePayment">开启支付</a>
+  {{# } }}
+  <a class="layui-btn layui-btn-xs" lay-event="setLimit">限额</a>
+  <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="edit">修改</a>
+  <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="delete" style="background-color:#FF5722">删除</a>
+  {{# } else if(d.status===3){ }}
+  <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="edit">修改</a>
+  <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="delete" style="background-color:#FF5722">删除</a>
+  {{# } else { }}
+  <span style="color:gray">-</span>
+  {{# } }}
+</script>
+
+</body></html>

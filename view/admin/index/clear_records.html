@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>清空记录</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+body{background:#f0f2f5;padding:20px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;}
+.clear-card{background:#fff;border-radius:8px;padding:24px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;align-items:center;justify-content:space-between;}
+.clear-card .info{flex:1;}
+.clear-card .info h3{font-size:16px;color:#333;margin:0 0 6px 0;}
+.clear-card .info p{font-size:13px;color:#999;margin:0;}
+.clear-card .icon{font-size:36px;margin-right:20px;opacity:0.7;}
+.clear-btn{min-width:100px;}
+.page-title{font-size:20px;font-weight:700;color:#333;margin-bottom:20px;}
+.page-desc{font-size:13px;color:#999;margin-bottom:20px;}
+.result-msg{margin-top:8px;font-size:13px;display:none;}
+</style>
+</head>
+<body>
+<div class="page-title">清空记录</div>
+<div class="page-desc">以下操作不可恢复，请谨慎操作。清空聊天记录时会保留未认领且未关闭的会话。</div>
+
+<div class="clear-card">
+    <span class="icon">📋</span>
+    <div class="info">
+        <h3>清空投诉记录</h3>
+        <p>清除所有投诉单及投诉消息记录</p>
+        <div class="result-msg" id="result-complaint"></div>
+    </div>
+    <button class="layui-btn layui-btn-danger clear-btn" onclick="doClear('complaint')">清空投诉</button>
+</div>
+
+<div class="clear-card">
+    <span class="icon">💬</span>
+    <div class="info">
+        <h3>清空客户留言</h3>
+        <p>清除所有客户留言记录</p>
+        <div class="result-msg" id="result-customer_message"></div>
+    </div>
+    <button class="layui-btn layui-btn-danger clear-btn" onclick="doClear('customer_message')">清空留言</button>
+</div>
+
+<div class="clear-card">
+    <span class="icon">🎧</span>
+    <div class="info">
+        <h3>清空在线客服聊天记录</h3>
+        <p>清除已认领或已关闭的会话及消息，删除聊天图片。未认领且未关闭的会话不受影响。</p>
+        <div class="result-msg" id="result-chat"></div>
+    </div>
+    <button class="layui-btn layui-btn-danger clear-btn" onclick="doClear('chat')">清空聊天</button>
+</div>
+
+<div class="clear-card">
+    <span class="icon">✉️</span>
+    <div class="info">
+        <h3>清空站内信</h3>
+        <p>清除所有站内信消息记录</p>
+        <div class="result-msg" id="result-message"></div>
+    </div>
+    <button class="layui-btn layui-btn-danger clear-btn" onclick="doClear('message')">清空站内信</button>
+</div>
+
+<div class="clear-card">
+    <span class="icon">🗑️</span>
+    <div class="info">
+        <h3>清空缓存</h3>
+        <p>清除系统运行时缓存（不影响数据）</p>
+        <div class="result-msg" id="result-cache"></div>
+    </div>
+    <button class="layui-btn layui-btn-warm clear-btn" onclick="doClear('cache')">清空缓存</button>
+</div>
+
+<div class="clear-card" style="border:2px solid #FF5722;">
+    <span class="icon">⚠️</span>
+    <div class="info">
+        <h3 style="color:#FF5722;">一键全部清空</h3>
+        <p>执行以上所有清空操作（投诉+留言+聊天+站内信+缓存）</p>
+        <div class="result-msg" id="result-all"></div>
+    </div>
+    <button class="layui-btn layui-btn-danger clear-btn" style="background:#FF5722;" onclick="doClear('all')">全部清空</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+layui.use(['layer','jquery'],function(){
+    var layer=layui.layer,$=layui.jquery;
+    window.doClear=function(type){
+        var names={complaint:'投诉记录',customer_message:'客户留言',chat:'聊天记录',message:'站内信',cache:'缓存',all:'全部记录'};
+        layer.confirm('确定要清空'+names[type]+'吗？此操作不可恢复！',{icon:3,title:'确认清空',btn:['确定','取消']},function(index){
+            layer.close(index);
+            layer.msg('正在清空...',{icon:16,shade:0.3,time:0});
+            $.ajax({
+                url:'/index/adminClearRecordsDo',
+                type:'POST',
+                data:{type:type},
+                headers:{'X-Requested-With':'XMLHttpRequest'},
+                success:function(res){
+                    layer.closeAll('msg');
+                    if(res.code===0){
+                        layer.msg(res.msg||'清空成功',{icon:1});
+                        var $r=$('#result-'+type);
+                        $r.html('<span style="color:#16b777;">✓ '+res.msg+' '+res.detail+'</span>').show();
+                    }else{
+                        layer.msg(res.msg||'操作失败',{icon:2});
+                    }
+                },
+                error:function(){
+                    layer.closeAll('msg');
+                    layer.msg('请求失败',{icon:2});
+                }
+            });
+        });
+    };
+});
+</script>
+</body>
+</html>

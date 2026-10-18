@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>客户留言管理</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+body{margin:0;padding:15px;background:#f2f2f2}
+.layui-card{margin-bottom:10px}
+.layui-table th,.layui-table td{text-align:center !important;vertical-align:middle !important;overflow:visible !important}
+.img-thumb{width:50px;height:50px;object-fit:cover;border-radius:4px;cursor:pointer;margin:0 2px;border:1px solid #eee}
+.msg-content{word-break:break-all;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-align:left;line-height:1.5}
+.reply-tag{display:inline-block;background:#e6ffed;color:#009688;font-size:11px;padding:1px 6px;border-radius:3px;margin-top:3px}
+.badge-open{color:#FF5722;font-weight:bold}
+.badge-replied{color:#009688;font-weight:bold}
+.badge-closed{color:#999}
+.detail-wrap{padding:20px}
+.detail-row{margin-bottom:15px}
+.detail-label{font-weight:bold;color:#333;margin-bottom:5px;font-size:14px}
+.detail-value{color:#666;line-height:1.6;word-break:break-all;white-space:pre-wrap;padding:8px 12px;background:#f8f8f8;border-radius:4px}
+.detail-imgs{display:flex;gap:8px;flex-wrap:wrap}
+.detail-imgs img{width:120px;height:120px;object-fit:cover;border-radius:4px;cursor:pointer;border:1px solid #eee}
+.detail-reply{background:#f0f9ff;border-left:3px solid #1e9fff;padding:10px 15px;border-radius:0 4px 4px 0;margin-top:5px}
+.detail-reply-time{color:#1e9fff;font-size:12px;margin-bottom:5px}
+.detail-status{display:inline-block;padding:2px 10px;border-radius:10px;font-size:12px}
+.st-open{background:#fff7e6;color:#FF5722}
+.st-replied{background:#e6ffed;color:#009688}
+.st-closed{background:#f5f5f5;color:#999}
+</style>
+</head>
+<body>
+<div class="layui-card">
+<div class="layui-card-body" style="padding:10px 15px">
+<form class="layui-form" style="display:flex;gap:10px;align-items:center">
+<select name="status" lay-filter="statusFilter">
+<option value="">全部状态</option>
+<option value="1">待处理</option>
+<option value="4">已回复</option>
+<option value="2">用户关闭</option>
+<option value="3">后台关闭</option>
+</select>
+</form>
+</div>
+</div>
+
+<table id="msgTable" lay-filter="msgTable"></table>
+
+<script type="text/html" id="imagesTpl">
+{{# if(d.image_urls && d.image_urls.length > 0){ }}
+{{# d.image_urls.forEach(function(url){ }}
+<img src="{{ url }}" class="img-thumb" onclick="previewImg('{{ url }}')">
+{{# }) }}
+{{# } else { }}
+<span style="color:#ccc">-</span>
+{{# } }}
+</script>
+
+<script type="text/html" id="contentTpl">
+<div class="msg-content">{{ d.content }}</div>
+</script>
+
+<script type="text/html" id="statusTpl">
+{{# if(d.status == 1){ }}
+<span class="badge-open">待处理</span>
+{{# } else if(d.status == 4){ }}
+<span class="badge-replied">已回复</span>
+{{# } else { }}
+<span class="badge-closed">{{ d.status == 2 ? '用户关闭' : '后台关闭' }}</span>
+{{# } }}
+</script>
+
+<script type="text/html" id="actionTpl">
+<button class="layui-btn layui-btn-sm layui-btn-normal" onclick="detailMsg({{ d.id }})">详情</button>
+{{# if(d.status == 1 || d.status == 4){ }}
+<button class="layui-btn layui-btn-sm" onclick="replyMsg({{ d.id }})">回复</button>
+<button class="layui-btn layui-btn-sm layui-btn-warm" onclick="closeMsg({{ d.id }})">关闭</button>
+{{# } }}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+layui.use(['table','layer','form'], function(){
+    var table = layui.table;
+    var layer = layui.layer;
+    var form = layui.form;
+
+    var tableIns = table.render({
+        elem: '#msgTable',
+        url: '/index/adminCustomerMessageListData',
+        method: 'get',
+        page: true,
+        limit: 15,
+        limits: [15, 30, 50],
+        cols: [[
+            {field:'id', title:'ID', align:'center', sort:true},
+            {field:'username', title:'用户', align:'center'},
+            {field:'content', title:'留言内容', align:'center', templet: '#contentTpl'},
+            {field:'images', title:'图片', align:'center', templet: '#imagesTpl'},
+            {field:'status', title:'状态', align:'center', templet: '#statusTpl'},
+            {field:'created_at', title:'提交时间', align:'center'},
+            {field:'admin_reply_at', title:'回复时间', align:'center'},
+            {title:'操作', align:'center', templet: '#actionTpl'}
+        ]],
+        parseData: function(res){
+            return {code: res.code, msg: res.msg, count: res.count, data: res.data};
+        }
+    });
+
+    form.on('select(statusFilter)', function(data){
+        tableIns.reload({where: {status: data.value}, page: {curr: 1}});
+    });
+});
+
+function getRowById(id){
+    var cache = layui.table.cache['msgTable'] || [];
+    for(var i = 0; i < cache.length; i++){
+        if(cache[i].id == id) return cache[i];
+    }
+    return null;
+}
+
+function detailMsg(id){
+    var d = getRowById(id);
+    if(!d){ layui.layer.msg('数据不存在'); return; }
+
+    var statusMap = {1:'待处理', 2:'用户关闭', 3:'后台关闭', 4:'已回复'};
+    var statusClass = {1:'st-open', 2:'st-closed', 3:'st-closed', 4:'st-replied'};
+    var st = statusMap[d.status] || '未知';
+    var sc = statusClass[d.status] || 'st-closed';
+
+    var html = '<div class="detail-wrap">';
+    html += '<div class="detail-row"><div class="detail-label">留言ID</div><div class="detail-value">#' + d.id + '</div></div>';
+    html += '<div class="detail-row"><div class="detail-label">用户</div><div class="detail-value">' + (d.username || 'ID:' + d.user_id) + '</div></div>';
+    html += '<div class="detail-row"><div class="detail-label">状态</div><div><span class="detail-status ' + sc + '">' + st + '</span></div></div>';
+    html += '<div class="detail-row"><div class="detail-label">留言内容</div><div class="detail-value">' + (d.content || '') + '</div></div>';
+
+    if(d.image_urls && d.image_urls.length > 0){
+        html += '<div class="detail-row"><div class="detail-label">附图 (' + d.image_urls.length + '张)</div><div class="detail-imgs">';
+        d.image_urls.forEach(function(url){
+            html += '<img src="' + url + '" onclick="previewImg(\'' + url + '\')">';
+        });
+        html += '</div></div>';
+    }
+
+    html += '<div class="detail-row"><div class="detail-label">提交时间</div><div class="detail-value">' + (d.created_at || '') + '</div></div>';
+
+    if(d.admin_reply){
+        html += '<div class="detail-row"><div class="detail-label">客服回复</div>';
+        html += '<div class="detail-reply">';
+        html += '<div class="detail-reply-time">回复时间：' + (d.admin_reply_at || '') + '</div>';
+        html += '<div>' + d.admin_reply + '</div>';
+        html += '</div></div>';
+    } else {
+        html += '<div class="detail-row"><div class="detail-label">客服回复</div><div class="detail-value" style="color:#ccc">暂无回复</div></div>';
+    }
+    html += '</div>';
+
+    layui.layer.open({
+        type: 1,
+        title: '留言详情 #' + id,
+        area: ['550px', '600px'],
+        maxmin: true,
+        shadeClose: true,
+        content: html
+    });
+}
+
+function previewImg(url){
+    layui.layer.open({
+        type: 1,
+        title: false,
+        area: ['80%', '80%'],
+        shadeClose: true,
+        content: '<img src="'+url+'" style="width:100%;height:100%;object-fit:contain">'
+    });
+}
+
+function replyMsg(id){
+    layui.layer.prompt({
+        formType: 2,
+        title: '回复留言 #'+id,
+        area: ['500px', '200px'],
+        placeholder: '请输入回复内容...'
+    }, function(value, index){
+        if(!value.trim()){
+            layui.layer.msg('回复内容不能为空');
+            return;
+        }
+        layui.jquery.post('/index/adminCustomerMessageReply', {id: id, reply: value}, function(res){
+            if(res.code == 0){
+                layui.layer.msg('回复成功', {icon: 1});
+                layui.layer.close(index);
+                layui.table.reload('msgTable');
+            } else {
+                layui.layer.msg(res.msg, {icon: 2});
+            }
+        });
+    });
+}
+
+function closeMsg(id){
+    layui.layer.confirm('确定要关闭此留言吗？', function(index){
+        layui.jquery.post('/index/adminCustomerMessageClose', {id: id}, function(res){
+            if(res.code == 0){
+                layui.layer.msg('已关闭', {icon: 1});
+                layui.layer.close(index);
+                layui.table.reload('msgTable');
+            } else {
+                layui.layer.msg(res.msg, {icon: 2});
+            }
+        });
+    });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>群发广播管理</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+body { background: #f0f2f5; padding: 20px; margin: 0; }
+.card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.pager { margin-top: 15px; text-align: center; }
+.pager button { margin: 0 5px; }
+.msg-content { max-width: 300px; word-break: break-all; }
+.type-tag { padding: 2px 8px; border-radius: 4px; font-size: 12px; display: inline-block; background: #e6f7ff; color: #1890ff; }
+.read-bar { display: inline-block; width: 100px; height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden; vertical-align: middle; margin: 0 5px; }
+.read-bar-inner { height: 100%; background: #52c41a; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h2 style="font-size:16px;margin:0 0 15px 0;">发送群发广播</h2>
+  <div style="margin-bottom:10px;">
+    <input type="text" id="bTitle" placeholder="广播标题" style="width:100%;max-width:400px;height:38px;border:1px solid #e6e6e6;border-radius:2px;padding:0 10px;box-sizing:border-box;">
+  </div>
+  <div style="margin-bottom:10px;">
+    <textarea id="bContent" placeholder="广播内容（支持纯文本）" style="width:100%;max-width:600px;height:100px;border:1px solid #e6e6e6;border-radius:2px;padding:10px;box-sizing:border-box;resize:vertical;"></textarea>
+  </div>
+  <button class="layui-btn" onclick="sendBroadcast()">发送广播（全体用户）</button>
+  <span style="color:#999;font-size:12px;margin-left:10px;">广播只写入1条记录，所有用户共享，不会逐条复制</span>
+</div>
+
+<div class="card">
+  <h2 style="font-size:16px;margin:0 0 15px 0;">广播列表</h2>
+  <table class="layui-table" style="margin-top:10px;">
+    <thead>
+      <tr>
+        <th style="width:60px;">ID</th>
+        <th style="width:150px;">标题</th>
+        <th>内容</th>
+        <th style="width:180px;">已读/总用户</th>
+        <th style="width:150px;">发送时间</th>
+        <th style="width:100px;">操作</th>
+      </tr>
+    </thead>
+    <tbody id="listBody">
+      <tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">加载中...</td></tr>
+    </tbody>
+  </table>
+  <div class="pager" id="pager"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+var currentPage = 1;
+var totalPages = 1;
+var pageSize = 20;
+
+function loadList(page) {
+  if (page) currentPage = page;
+  var url = '/index/adminBroadcastListData?page=' + currentPage + '&limit=' + pageSize;
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      if (res.code !== 0) {
+        document.getElementById('listBody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:red;">' + (res.msg || '加载失败') + '</td></tr>';
+        return;
+      }
+      var list = res.data.list || [];
+      var total = res.data.total || 0;
+      totalPages = Math.ceil(total / pageSize) || 1;
+      if (list.length === 0) {
+        document.getElementById('listBody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">暂无广播</td></tr>';
+      } else {
+        var html = '';
+        list.forEach(function(item) {
+          var readPct = item.total_users > 0 ? Math.round(item.read_count / item.total_users * 100) : 0;
+          html += '<tr>';
+          html += '<td>' + item.id + '</td>';
+          html += '<td><span class="type-tag">广播</span> ' + (item.title || '--') + '</td>';
+          html += '<td class="msg-content">' + (item.content || '--') + '</td>';
+          html += '<td>' + item.read_count + ' / ' + item.total_users;
+          html += ' <div class="read-bar"><div class="read-bar-inner" style="width:' + readPct + '%;"></div></div>';
+          html += ' (' + readPct + '%)</td>';
+          html += '<td>' + (item.created_at || '--') + '</td>';
+          html += '<td><button class="layui-btn layui-btn-sm layui-btn-danger" onclick="deleteBroadcast(' + item.id + ')">删除</button></td>';
+          html += '</tr>';
+        });
+        document.getElementById('listBody').innerHTML = html;
+      }
+      var pagerHtml = '';
+      if (currentPage > 1) {
+        pagerHtml += '<button class="layui-btn layui-btn-sm layui-btn-primary" onclick="loadList(' + (currentPage - 1) + ')">上一页</button>';
+      }
+      pagerHtml += '<span style="margin:0 10px;">第 ' + currentPage + ' / ' + totalPages + ' 页 (共' + total + '条)</span>';
+      if (currentPage < totalPages) {
+        pagerHtml += '<button class="layui-btn layui-btn-sm layui-btn-primary" onclick="loadList(' + (currentPage + 1) + ')">下一页</button>';
+      }
+      document.getElementById('pager').innerHTML = pagerHtml;
+    })
+    .catch(function(e) {
+      document.getElementById('listBody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:red;">请求失败：' + e.message + '</td></tr>';
+    });
+}
+
+function sendBroadcast() {
+  var title = document.getElementById('bTitle').value.trim();
+  var content = document.getElementById('bContent').value.trim();
+  if (!title) { layui.layer.msg('请输入标题'); return; }
+  if (!content) { layui.layer.msg('请输入内容'); return; }
+  layui.layer.confirm('确定向全体用户发送此广播？', function(index) {
+    fetch('/index/adminBroadcastCreate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title, content: content })
+    }).then(function(r) { return r.json(); }).then(function(res) {
+      layui.layer.msg(res.code === 0 ? '发送成功' : (res.msg || '演示不允许发送广播'));
+      if (res.code === 0) {
+        document.getElementById('bTitle').value = '';
+        document.getElementById('bContent').value = '';
+        loadList(1);
+      }
+    }).catch(function(e) {
+      layui.layer.msg('对不起演示系统不允许提交数据');
+    });
+    layui.layer.close(index);
+  });
+}
+
+function deleteBroadcast(id) {
+  layui.layer.confirm('确定删除这条广播？已读记录也会清除。', function(index) {
+    fetch('/index/adminBroadcastDelete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id })
+    }).then(function(r) { return r.json(); }).then(function(res) {
+      layui.layer.msg(res.code === 0 ? '删除成功' : (res.msg || '删除失败'));
+      if (res.code === 0) loadList(currentPage);
+    }).catch(function(e) {
+      layui.layer.msg('请保留该数据，供其他人参考！' );
+    });
+    layui.layer.close(index);
+  });
+}
+
+loadList(1);
+</script>
+</body>
+</html>

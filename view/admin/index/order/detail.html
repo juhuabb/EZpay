@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单详情 - 积分管理系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@3.1.1/dist/css/layui.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; }
+        .content-card {
+            background: #fff; border-radius: 6px; padding: 24px 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 20px;
+        }
+        .content-card .card-title {
+            font-size: 16px; font-weight: 600; color: #333;
+            margin-bottom: 16px; padding-bottom: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .content-card .card-title i { color: #2979FF; margin-right: 6px; }
+        .detail-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 30px; }
+        .detail-info .info-item { display: flex; padding: 8px 0; border-bottom: 1px dashed #f0f0f0; }
+        .detail-info .info-label { color: #999; width: 100px; flex-shrink: 0; }
+        .detail-info .info-value { color: #333; flex: 1; word-break: break-all; }
+        .timeline { position: relative; padding-left: 30px; }
+        .timeline::before { content: ''; position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: #e8e8e8; }
+        .timeline-item { position: relative; padding-bottom: 20px; }
+        .timeline-item::before {
+            content: ''; position: absolute; left: -24px; top: 4px;
+            width: 10px; height: 10px; border-radius: 50%;
+            background: #2979FF; border: 2px solid #fff;
+            box-shadow: 0 0 0 2px #2979FF;
+        }
+        .timeline-item .time { color: #999; font-size: 12px; }
+        .timeline-item .desc { color: #333; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <div class="content-card">
+        <div class="card-title"><i class="layui-icon layui-icon-form"></i>订单信息</div>
+        <div class="detail-info" id="orderInfo">
+            <div style="text-align:center;color:#999;padding:20px;grid-column:1/-1;">加载中...</div>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="card-title"><i class="layui-icon layui-icon-rmb"></i>关联交易流水</div>
+        <div id="transactionTimeline">
+            <div style="text-align:center;color:#999;padding:20px;">加载中...</div>
+        </div>
+    </div>
+
+    <div class="content-card" id="actionCard">
+        <div class="card-title"><i class="layui-icon layui-icon-set"></i>操作</div>
+        <button class="layui-btn layui-btn-danger" id="btnCloseOrder">
+            <i class="layui-icon layui-icon-close"></i> 强制关闭订单
+        </button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/layui@3.1.1/dist/layui.js"></script>
+    <script>
+        var __apiToken = '';
+        window.addEventListener('message', function(e) { if (e.data && e.data.type === 'setToken') __apiToken = e.data.token; });
+
+        layui.use(['layer'], function() {
+            var layer = layui.layer;
+            var $ = layui.$;
+            var orderId = {$orderId};
+
+            function getAuthHeaders() {
+                return { 'Authorization': 'Bearer ' + __apiToken };
+            }
+
+            var statusMap = {0:'挂单中', 1:'已匹配', 2:'支付中', 3:'已完成', 4:'已关闭'};
+            var statusBadge = {
+                0: 'layui-bg-blue', 1: 'layui-bg-cyan', 2: 'layui-bg-orange',
+                3: 'layui-bg-green', 4: ''
+            };
+
+            // 加载订单信息
+            $.ajax({
+                url: '/admin/orders/' + orderId,
+                headers: getAuthHeaders(),
+                success: function(res) {
+                    if (res.code === 0 && res.data) {
+                        var o = res.data;
+                        var st = statusMap[o.status] || '未知';
+                        var sb = statusBadge[o.status] || 'layui-bg-gray';
+
+                        var html = '' +
+                            '<div class="info-item"><div class="info-label">订单ID</div><div class="info-value">' + o.id + '</div></div>' +
+                            '<div class="info-item"><div class="info-label">订单号</div><div class="info-value">' + (o.order_no||'-') + '</div></div>' +
+                            '<div class="info-item"><div class="info-label">标题</div><div class="info-value">' + (o.title||'-') + '</div></div>' +
+                            '<div class="info-item"><div class="info-label">金额</div><div class="info-value" style="color:#f56c6c;font-weight:600;">' + parseFloat(o.amount||0).toFixed(2) + '</div></div>' +
+                            '<div class="info-item"><div class="info-label">商户</div><div class="info-value">' + (o.merchant && o.merchant.user ? o.merchant.user.username : '-') + '</div></div>' +
+                            '<div class="info-item"><div class="info-label">创建者</div><div class="info-value">' + (o.creator ? o.creator.username : '-') + '</div></div>' +
+                            '<div class="info-item"><div class="info-label">状态</div><div class="info-value"><span class="layui-badge ' + sb + '">' + st + '</span></div></div>' +
+                            '<div class="info-item"><div class="info-label">创建时间</div><div class="info-value">' + (o.created_at||'-') + '</div></div>' +
+                            '<div class="info-item"><div class="info-label">更新时间</div><div class="info-value">' + (o.updated_at||'-') + '</div></div>';
+                        $('#orderInfo').html(html);
+
+                        // 交易流水时间线
+                        if (o.transactions && o.transactions.length > 0) {
+                            var timelineHtml = '<div class="timeline">';
+                            o.transactions.forEach(function(t) {
+                                timelineHtml += '<div class="timeline-item">' +
+                                    '<div class="time">' + (t.created_at||'') + '</div>' +
+                                    '<div class="desc">交易 #' + t.id + ' - 金额: ' + parseFloat(t.amount||0).toFixed(2) + ' - 状态: ' + (statusMap[t.status]||'未知') + '</div>' +
+                                    '</div>';
+                            });
+                            timelineHtml += '</div>';
+                            $('#transactionTimeline').html(timelineHtml);
+                        } else {
+                            $('#transactionTimeline').html('<div style="text-align:center;color:#999;padding:20px;">暂无关联交易</div>');
+                        }
+
+                        // 已完成/已关闭的订单隐藏关闭按钮
+                        if (o.status >= 3) {
+                            $('#actionCard').hide();
+                        }
+                    } else {
+                        $('#orderInfo').html('<div style="text-align:center;color:#999;padding:20px;grid-column:1/-1;">订单不存在</div>');
+                    }
+                }
+            });
+
+            // 关闭订单
+            $('#btnCloseOrder').on('click', function() {
+                layer.confirm('确认强制关闭该订单？此操作不可撤销。', {icon: 3}, function(index) {
+                    $.ajax({
+                        url: '/admin/orders/' + orderId + '/close',
+                        type: 'POST',
+                        headers: getAuthHeaders(),
+                        success: function(res) {
+                            if (res.code === 0) {
+                                layer.msg('订单已关闭', {icon: 1});
+                                setTimeout(function() { location.reload(); }, 1000);
+                            } else {
+                                layer.msg(res.msg, {icon: 2});
+                            }
+                        }
+                    });
+                    layer.close(index);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

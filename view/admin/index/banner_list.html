@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>广告管理</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+body{padding:20px;background:#f5f6fa;margin:0}
+.table-wrap{background:#fff;padding:0 20px 20px;border-radius:8px}
+.banner-thumb{width:120px;height:50px;object-fit:cover;border-radius:4px;border:1px solid #e8e8e8}
+</style>
+</head>
+<body>
+<div style="background:#fff;padding:16px 20px;border-radius:8px 8px 0 0;display:flex;justify-content:space-between;align-items:center">
+<div style="font-size:16px;font-weight:bold">广告位管理</div>
+<button class="layui-btn layui-btn-sm" id="btnAdd" style="background:#2979FF"><i class="layui-icon layui-icon-add-1"></i> 添加广告</button>
+</div>
+<div class="table-wrap">
+<table class="layui-table" > <img src="/img/3.jpg"></table>
+演示系统禁止修改创建广告！
+</div>
+
+<script type="text/html" id="imageTpl">
+{{# if(d.image_url){ }}
+<img class="banner-thumb" src="{{ d.image_url }}" onerror="this.src='https://via.placeholder.com/120x50/2979FF/fff?text=No+Image'">
+{{# } else { }}
+<span style="color:#ccc">无图片</span>
+{{# } }}
+</script>
+
+<script type="text/html" id="statusTpl">
+{{# if(d.status === 1){ }}
+<span class="layui-badge layui-bg-green">启用</span>
+{{# } else { }}
+<span class="layui-badge layui-bg-gray">禁用</span>
+{{# } }}
+</script>
+
+<script type="text/html" id="bannerBar">
+<a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+{{# if(d.status === 1){ }}
+<a class="layui-btn layui-btn-xs layui-btn-warm" lay-event="toggle">禁用</a>
+{{# } else { }}
+<a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="toggle">启用</a>
+{{# } }}
+<a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="del">删除</a>
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+layui.use(['table','layer','upload','form'],function(){
+    var table=layui.table,layer=layui.layer,upload=layui.upload,form=layui.form,$=layui.$;
+    var token=localStorage.getItem('admin_token')||'';
+
+    table.render({
+        elem:'#bannerTable',
+        url:'/index/adminBannerListData',
+        headers:{'Authorization':'Bearer '+token},
+        parseData:function(r){
+            return{code:r.code===0?0:1,msg:r.msg||'',count:r.data?r.data.total:0,data:r.data?r.data.list:[]};
+        },
+        page:false,
+        limit:100,
+        cols:[[
+            {field:'id',title:'ID',width:60,sort:true},
+            {field:'title',title:'标题',width:150},
+            {field:'image_url',title:'广告图片',width:140,templet:'#imageTpl'},
+            {field:'link_url',title:'跳转链接',width:200,templet:function(d){
+                return d.link_url?'<span style="color:#2979FF;cursor:pointer" title="'+d.link_url+'">'+d.link_url+'</span>':'<span style="color:#ccc">-</span>';
+            }},
+            {field:'sort_order',title:'排序',width:80,sort:true},
+            {field:'status',title:'状态',width:90,templet:'#statusTpl'},
+            {field:'created_at',title:'创建时间',width:170},
+            {title:'操作',width:200,toolbar:'#bannerBar',fixed:'right'}
+        ]]
+    });
+
+    function openForm(data){
+        data=data||{};
+        layer.open({
+            type:1,
+            title:data.id?'编辑广告':'添加广告',
+            area:['500px','480px'],
+            content:'<form class="layui-form" style="padding:20px" lay-filter="bannerForm">'+
+                '<input type="hidden" name="id" value="'+(data.id||'')+'">'+
+                '<div class="layui-form-item"><label class="layui-form-label">广告标题</label><div class="layui-input-block"><input type="text" name="title" class="layui-input" value="'+(data.title||'')+'" placeholder="用于后台识别，不显示在前端"></div></div>'+
+                '<div class="layui-form-item"><label class="layui-form-label">广告图片</label><div class="layui-input-block">'+
+                '<div style="display:flex;gap:10px;align-items:flex-start">'+
+                '<input type="text" name="image_url" id="imgUrlInput" class="layui-input" value="'+(data.image_url||'')+'" placeholder="图片URL或上传" style="flex:1">'+
+                '<button type="button" class="layui-btn layui-btn-sm" id="btnUpload" style="background:#2979FF">上传</button>'+
+                '</div>'+
+                '<div id="imgPreview" style="margin-top:10px">'+(data.image_url?'<img src="'+data.image_url+'" style="max-width:300px;max-height:100px;border-radius:4px;border:1px solid #e8e8e8">':'')+'</div>'+
+                '</div></div>'+
+                '<div class="layui-form-item"><label class="layui-form-label">跳转链接</label><div class="layui-input-block"><input type="text" name="link_url" class="layui-input" value="'+(data.link_url||'')+'" placeholder="点击广告跳转的地址，留空不跳转"></div></div>'+
+                '<div class="layui-form-item"><label class="layui-form-label">排序</label><div class="layui-input-block"><input type="number" name="sort_order" class="layui-input" value="'+(data.sort_order||0)+'" placeholder="数字越大越靠前"></div></div>'+
+                '<div class="layui-form-item"><label class="layui-form-label">状态</label><div class="layui-input-block"><select name="status"><option value="1"'+(data.status!==0?' selected':'')+'>启用</option><option value="0"'+(data.status===0?' selected':'')+'>禁用</option></select></div></div>'+
+                '<div class="layui-form-item"><div class="layui-input-block"><button type="button" class="layui-btn layui-btn-normal" lay-submit lay-filter="saveBanner">保存</button></div></div>'+
+                '</form>',
+            success:function(){
+                form.render();
+                upload.render({
+                    elem:'#btnUpload',
+                    url:'/index/adminBannerUpload',
+                    headers:{'Authorization':'Bearer '+token},
+                    accept:'images',
+                    acceptMime:'image/*',
+                    size:2048,
+                    done:function(res){
+                        if(res.code===0){
+                            $('#imgUrlInput').val(res.data.url);
+                            $('#imgPreview').html('<img src="'+res.data.url+'" style="max-width:300px;max-height:100px;border-radius:4px;border:1px solid #e8e8e8">');
+                            layer.msg('上传成功',{icon:1});
+                        }else{
+                            layer.msg(res.msg||'演示系统不允许上传数据');
+                        }
+                    }
+                });
+                form.on('submit(saveBanner)',function(d){
+                    $.ajax({
+                        url:'/index/adminBannerSave',
+                        type:'POST',
+                        headers:{'Authorization':'Bearer '+token},
+                        contentType:'application/json',
+                        data:JSON.stringify(d.field),
+                        success:function(res){
+                            if(res.code===0){
+                                layer.msg(res.msg,{icon:1});
+                                layer.closeAll();
+                                table.reload('bannerTable');
+                            }else{
+                                layer.msg(res.msg||'保存失败',{icon:2});
+                            }
+                        },
+                        error:function(){layer.msg('广告发布在演示系统中无法修改提交！';}
+                    });
+                    return false;
+                });
+            }
+        });
+    }
+
+    $('#btnAdd').on('click',function(){openForm();});
+
+    table.on('tool(bannerTable)',function(obj){
+        var data=obj.data;
+        if(obj.event==='edit'){
+            openForm(data);
+        }else if(obj.event==='del'){
+            layer.confirm('确定删除此广告？',function(index){
+                layer.close(index);
+                $.ajax({
+                    url:'/index/adminBannerDelete',
+                    type:'POST',
+                    headers:{'Authorization':'Bearer '+token},
+                    contentType:'application/json',
+                    data:JSON.stringify({id:data.id}),
+                    success:function(res){
+                        if(res.code===0){layer.msg(res.msg,{icon:1});table.reload('bannerTable');}
+                        else{layer.msg(res.msg||'请不要删除数据，供其他人参考！';}
+                    }
+                });
+            });
+        }else if(obj.event==='toggle'){
+            $.ajax({
+                url:'/index/adminBannerToggle',
+                type:'POST',
+                headers:{'Authorization':'Bearer '+token},
+                contentType:'application/json',
+                data:JSON.stringify({id:data.id}),
+                success:function(res){
+                    if(res.code===0){layer.msg(res.msg,{icon:1});table.reload('bannerTable');}
+                    else{layer.msg(res.msg||'广告切换主要是启用和禁用';}
+                }
+            });
+        }
+    });
+});
+</script>
+</body>
+</html>

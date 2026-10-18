@@ -1,0 +1,131 @@
+<style>
+.search-bar { background:#fff; padding:15px; border-radius:6px; margin-bottom:15px; }
+.img-thumb { width:60px; height:40px; cursor:pointer; border-radius:4px; border:1px solid #eee; }
+.status-0 { color:#FF9800; font-weight:bold; }
+.status-1 { color:#4CAF50; font-weight:bold; }
+.status-2 { color:#f44336; font-weight:bold; }
+</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+
+<div class="search-bar">
+    <form class="layui-form" lay-filter="searchForm">
+        <div class="layui-inline">
+            <label class="layui-form-label">状态</label>
+            <div class="layui-input-inline" style="width:150px">
+                <select name="status">
+                    <option value="">全部</option>
+                    <option value="0">待审核</option>
+                    <option value="1">已通过</option>
+                    <option value="2">已拒绝</option>
+                </select>
+            </div>
+        </div>
+        <div class="layui-inline">
+            <label class="layui-form-label">关键词</label>
+            <div class="layui-input-inline" style="width:200px">
+                <input type="text" name="keyword" placeholder="姓名/身份证号" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-inline">
+            <button class="layui-btn" lay-submit lay-filter="doSearch">搜索</button>
+        </div>
+    </form>
+</div>
+
+<table id="t" lay-filter="t"></table>
+
+<script type="text/html" id="actionTpl">
+    {{# if(d.status == 0) { }}
+        <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="approve">通过</a>
+        <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="reject">拒绝</a>
+        <a class="layui-btn layui-btn-xs" lay-event="detail">详情</a>
+    {{# } else { }}
+        <span class="status-{{d.status}}">{{ d.status===1?'已通过':'已拒绝' }}</span>
+        <a class="layui-btn layui-btn-xs" lay-event="detail">详情</a>
+    {{# } }}
+</script>
+
+<script>
+layui.use(['table', 'form', 'layer', 'jquery'], function(){
+    var table = layui.table, form = layui.form, layer = layui.layer, $ = layui.jquery;
+    form.render();
+    table.render({
+        elem: '#t',
+        url: '/index/adminVerifyListData',
+        headers: {'Authorization': 'Bearer ' + (localStorage.getItem('admin_token') || '')},
+        parseData: function(r){
+            return {code: r.code===0?0:1, data: r.data.list||[], count: r.data.total||0};
+        },
+        page: true,
+        cols: [[
+            {field:'id', title:'ID', width:70},
+            {field:'user_id', title:'用户ID', width:90},
+            {field:'real_name', title:'姓名', width:120},
+            {field:'id_card', title:'身份证号', width:180},
+            {field:'id_card_front', title:'正面', width:80, templet:function(d){
+                if(!d.id_card_front) return '-';
+                return '<img src="'+d.id_card_front+'" class="img-thumb" onclick="showImg(\''+d.id_card_front+'\')">';
+            }},
+            {field:'id_card_back', title:'反面', width:80, templet:function(d){
+                if(!d.id_card_back) return '-';
+                return '<img src="'+d.id_card_back+'" class="img-thumb" onclick="showImg(\''+d.id_card_back+'\')">';
+            }},
+            {field:'status', title:'状态', width:100, templet:function(d){
+                var cls='status-'+d.status;
+                var txt=d.status===0?'待审核':d.status===1?'已通过':'已拒绝';
+                return '<span class="'+cls+'">'+txt+'</span>';
+            }},
+            {title:'操作', width:220, toolbar:'#actionTpl'}
+        ]]
+    });
+
+    form.on('submit(doSearch)', function(data){
+        table.reload('t', {where: data.field, page:{curr:1}});
+        return false;
+    });
+
+    table.on('tool(t)', function(obj){
+        var d = obj.data;
+        if(obj.event === 'approve'){
+            layer.confirm('确认通过 '+d.real_name+' 的实名认证？', {icon:3}, function(i){
+                doReview(d.id, 'approve', '');
+                layer.close(i);
+            });
+        } else if(obj.event === 'reject'){
+            layer.prompt({title:'拒绝原因', formType:2}, function(reason, i){
+                doReview(d.id, 'reject', reason);
+                layer.close(i);
+            });
+        } else if(obj.event === 'detail'){
+            var html = '<div style="padding:20px">'
+                +'<p><b>姓名：</b>'+d.real_name+'</p>'
+                +'<p><b>身份证号：</b>'+d.id_card+'</p>'
+                +'<p><b>状态：</b>'+(d.status===0?'待审核':d.status===1?'已通过':'已拒绝')+'</p>'
+                +'<hr><p><b>正面：</b></p><p><img src="'+(d.id_card_front||'')+'" style="max-width:400px;max-height:250px;border:1px solid #eee;border-radius:6px"></p>'
+                +'<p style="margin-top:10px"><b>反面：</b></p><p><img src="'+(d.id_card_back||'')+'" style="max-width:400px;max-height:250px;border:1px solid #eee;border-radius:6px"></p>'
+                +'</div>';
+            layer.open({type:1, title:'认证详情', area:['500px','550px'], content:html, shadeClose:true});
+        }
+    });
+});
+
+function doReview(id, action, reason){
+    layui.jquery.ajax({
+        url: '/index/reviewVerify',
+        type: 'POST',
+        contentType: 'application/json',
+        headers: {'Authorization': 'Bearer ' + (localStorage.getItem('admin_token') || '')},
+        data: JSON.stringify({verify_id:id, action:action, reason:reason}),
+        success: function(res){
+            if(res.code===0){ layui.layer.msg(res.msg,{icon:1}); layui.table.reload('t'); }
+            else { layui.layer.msg(res.msg||'操作失败',{icon:2}); }
+        }
+    });
+}
+
+function showImg(url){
+    layui.layer.photos({photos:{data:[{src:url}]}, anim:5});
+}
+</script>
+

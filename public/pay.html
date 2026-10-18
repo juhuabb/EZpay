@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>支付确认</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }
+.page { max-width: 480px; margin: 0 auto; min-height: 100vh; background: #f5f5f5; position: relative; }
+
+/* 导航栏 */
+.navbar { background: #fff; padding: 12px 16px; display: flex; align-items: center; justify-content: center; position: relative; border-bottom: 1px solid #eee; position: sticky; top: 0; z-index: 100; }
+.navbar-back { position: absolute; left: 16px; font-size: 22px; color: #333; text-decoration: none; }
+.navbar-title { font-size: 17px; font-weight: 600; }
+
+/* 支付卡片 */
+.pay-card { margin: 16px; border-radius: 16px; overflow: hidden; position: relative; }
+.pay-card-bg { position: absolute; inset: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.pay-card-content { position: relative; padding: 28px 24px; color: #fff; }
+.pay-card-label { font-size: 14px; opacity: 0.8; }
+.pay-amount-row { display: flex; align-items: baseline; margin: 8px 0 20px; }
+.pay-amount-symbol { font-size: 20px; margin-right: 4px; }
+.pay-amount { font-size: 36px; font-weight: 700; }
+.info-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-top: 1px solid rgba(255,255,255,0.15); }
+.info-label { opacity: 0.7; }
+.info-value { font-weight: 500; word-break: break-all; text-align: right; max-width: 65%; }
+
+/* 状态卡片 */
+.status-card { margin: 24px 16px; background: #fff; border-radius: 16px; padding: 40px 24px; text-align: center; }
+.status-icon { font-size: 48px; display: block; margin-bottom: 16px; }
+.status-text { font-size: 18px; font-weight: 600; color: #333; display: block; margin-bottom: 8px; }
+.status-sub { font-size: 14px; color: #999; }
+.status-btn { display: inline-block; margin-top: 20px; padding: 12px 40px; background: #667eea; color: #fff; border: none; border-radius: 24px; font-size: 15px; cursor: pointer; }
+.status-btn:active { opacity: 0.8; }
+
+/* 登录表单 */
+.login-card { margin: 24px 16px; background: #fff; border-radius: 16px; padding: 32px 24px; }
+.login-title { font-size: 18px; font-weight: 600; text-align: center; margin-bottom: 24px; }
+.form-group { margin-bottom: 16px; }
+.form-label { font-size: 14px; color: #666; margin-bottom: 6px; display: block; }
+.form-input { width: 100%; padding: 12px 14px; border: 1px solid #ddd; border-radius: 10px; font-size: 15px; outline: none; transition: border-color 0.2s; }
+.form-input:focus { border-color: #667eea; }
+.btn-primary { width: 100%; padding: 14px; background: #667eea; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 500; cursor: pointer; margin-top: 8px; }
+.btn-primary:active { opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.5; }
+.login-tip { text-align: center; margin-top: 16px; font-size: 13px; color: #999; }
+
+/* 支付密码 */
+.pwd-card { margin: 16px; background: #fff; border-radius: 16px; padding: 28px 24px; text-align: center; }
+.pwd-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+.pwd-desc { font-size: 14px; color: #999; margin-bottom: 20px; }
+.pwd-inputs { display: flex; justify-content: center; gap: 10px; }
+.pwd-cell { width: 44px; height: 50px; border: 2px solid #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+.pwd-cell-filled { border-color: #667eea; }
+.pwd-dot { width: 10px; height: 10px; background: #333; border-radius: 50%; }
+.pwd-link { margin-top: 16px; font-size: 13px; color: #667eea; }
+
+/* 底部按钮 */
+.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; max-width: 480px; margin: 0 auto; padding: 12px 16px; background: #fff; border-top: 1px solid #eee; }
+.btn-pay { width: 100%; padding: 14px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border: none; border-radius: 24px; font-size: 16px; font-weight: 600; cursor: pointer; }
+.btn-pay:active { opacity: 0.85; }
+.btn-pay:disabled { opacity: 0.5; }
+
+/* 虚拟键盘 */
+.keyboard { position: fixed; bottom: 0; left: 0; right: 0; max-width: 480px; margin: 0 auto; background: #f2f2f7; border-top: 1px solid #ddd; z-index: 200; }
+.keyboard-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; border-bottom: 1px solid #e0e0e0; }
+.keyboard-title { font-size: 14px; color: #333; }
+.keyboard-close { font-size: 20px; color: #667eea; cursor: pointer; padding: 4px 8px; }
+.keyboard-keys { display: flex; flex-wrap: wrap; padding: 6px; }
+.keyboard-key { width: calc(33.333% - 6px); margin: 3px; padding: 16px 0; text-align: center; font-size: 22px; font-weight: 500; background: #fff; border-radius: 10px; cursor: pointer; user-select: none; transition: background 0.1s; }
+.keyboard-key:active { background: #ddd; }
+.keyboard-key.keyboard-delete { background: #e0e0e0; font-size: 18px; }
+
+/* Loading */
+.loading { text-align: center; padding: 60px 20px; color: #999; font-size: 15px; }
+.spinner { width: 32px; height: 32px; border: 3px solid #e0e0e0; border-top-color: #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Toast */
+.toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 999; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+.toast.show { opacity: 1; }
+
+/* Success */
+.success-circle { width: 64px; height: 64px; background: #4caf50; border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; }
+.success-check { color: #fff; font-size: 32px; }
+</style>
+</head>
+<body>
+<div class="page" id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+var API_BASE = '/api';
+var orderNo = '';
+
+// 获取URL参数
+function getParam(name) {
+    var u = new URLSearchParams(window.location.search);
+    return u.get(name) || '';
+}
+
+
+// Toast
+function showToast(msg, duration) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function() { t.classList.remove('show'); }, duration || 2000);
+}
+
+// AJAX
+function apiGet(url) {
+    return new Promise(function(resolve, reject) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', API_BASE + url, true);
+        var token = getToken();
+        if (token) { xhr.setRequestHeader('Authorization', 'Bearer ' + token); }
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                    try {
+                        var res = JSON.parse(xhr.responseText);
+                        if (res.code === 503) {
+                            showMaintenance(res.msg || '系统维护中，请稍后再试');
+                        }
+                        resolve(res);
+                    }
+                    catch(e) { reject(new Error('JSON解析失败')); }
+                } else if (xhr.status === 401) {
+                    clearToken();
+                    reject(new Error('未登录'));
+                } else {
+                    reject(new Error('HTTP ' + xhr.status));
+                }
+            }
+        };
+        xhr.send();
+    });
+}
+
+function apiPost(url, body) {
+    return new Promise(function(resolve, reject) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', API_BASE + url, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        var token = getToken();
+        if (token) { xhr.setRequestHeader('Authorization', 'Bearer ' + token); }
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                    try {
+                        var res = JSON.parse(xhr.responseText);
+                        if (res.code === 503) {
+                            showMaintenance(res.msg || '系统维护中，请稍后再试');
+                        }
+                        resolve(res);
+                    }
+                    catch(e) { reject(new Error('JSON解析失败')); }
+                } else if (xhr.status === 401) {
+                    clearToken();
+                    reject(new Error('未登录'));
+                } else {
+                    reject(new Error('HTTP ' + xhr.status));
+                }
+            }
+        };
+        xhr.send(JSON.stringify(body || {}));
+    });
+}
+
+// 状态
+var state = {
+    loading: true,
+    isLoggedIn: false,
+    orderInfo: null,
+    payPassword: '',
+    showKeyboard: false,
+    paying: false,
+    paySuccess: false,
+    successTip: '',
+    return_url: '',
+    loginLoading: false,
+    userBalance: null
+};
+
+// 渲染
+function render() {
+    var app = document.getElementById('app');
+    var html = '';
+
+    // 导航栏
+    html += '<div class="navbar"><a class="navbar-back" href="javascript:history.back()">&#8249;</a><span class="navbar-title">支付确认</span></div>';
+
+    if (state.loading) {
+        html += '<div class="loading"><div class="spinner"></div>正在加载订单信息...</div>';
+    } else if (!state.isLoggedIn) {
+        // 登录表单
+        html += '<div class="login-card">';
+        html += '<div class="login-title">体验系统不支持该功能，请购买商业版！</div>';
+        html += '<div class="login-title">TG：@wjf666,QQ:2924195738</div>';
+        
+    } else if (state.orderInfo) {
+        var info = state.orderInfo;
+        // 支付卡片
+        html += '<div class="pay-card"><div class="pay-card-bg"></div><div class="pay-card-content">';
+        html += '<div class="pay-card-label">体验系统不支持该功能，请购买商业版,联系QQ：2924195738</div>';
+        
+
+        if (info.status === 0) {
+            // 待支付 - 密码输入
+            html += '<div class="pwd-card">';
+            html += '<div class="pwd-title">请输入支付密码</div>';
+            html += '<div class="pwd-desc">支付 ' + info.amount + ' 积分</div>';
+            html += '<div class="pwd-inputs" onclick="state.showKeyboard=true;render()">';
+            for (var i = 0; i < 6; i++) {
+                var filled = state.payPassword.length > i;
+                var active = state.payPassword.length === i && state.showKeyboard;
+                html += '<div class="pwd-cell ' + (filled ? 'pwd-cell-filled' : '') + (active ? ' pwd-cell-filled' : '') + '">' + (filled ? '<span class="pwd-dot"></span>' : '') + '</div>';
+            }
+            html += '</div>';
+            html += '<div class="pwd-link" onclick="showToast(\'请联系客服重置支付密码\')">忘记支付密码？</div>';
+            html += '</div>';
+
+            // 底部按钮
+            html += '<div class="bottom-bar">';
+            html += '<button class="btn-pay" onclick="doPay()" ' + (state.paying || state.payPassword.length < 6 ? 'disabled' : '') + '>' + (state.paying ? '支付中...' : '确认支付 ' + info.amount + ' 积分') + '</button>';
+            html += '</div>';
+
+        
+        } else if (info.status === 1) {
+            html += '<div class="status-card"><span class="status-icon">&#10004;</span><span class="status-text">该订单已支付</span><span class="status-sub">无需重复支付</span>';
+            if (state.return_url) { html += '<br><a href="' + state.return_url + '" class="status-btn" style="text-decoration:none;display:inline-block;margin-top:20px;">返回商户</a>'; }
+            html += '</div>';
+        } else if (info.status === 4) {
+            html += '<div class="status-card"><span class="status-icon">&#9203;</span><span class="status-text">该订单已过期</span><span class="status-sub">请联系商户重新发起支付</span></div>';
+        } else if (info.status === 2) {
+            html += '<div class="status-card"><span class="status-icon">&#128176;</span><span class="status-text">该订单已退款</span></div>';
+        } else if (info.status === 3) {
+            html += '<div class="status-card"><span class="status-icon">&#10006;</span><span class="status-text">该订单已取消</span></div>';
+        } else {
+            html += '<div class="status-card"><span class="status-icon">&#9888;</span><span class="status-text">订单状态: ' + (info.status_text || '未知') + '</span></div>';
+        }
+    } else {
+        html += '<div class="status-card"><span class="status-icon">&#9888;</span><span class="status-text">订单不存在</span></div>';
+    }
+
+    app.innerHTML = html;
+}
+
+// 输入密码
+function inputPwd(digit) {
+    if (state.payPassword.length < 6) {
+        state.payPassword += digit;
+        render();
+        if (state.payPassword.length === 6) {
+            // 自动支付
+            setTimeout(function() { doPay(); }, 300);
+        }
+    }
+}
+function delPwd() {
+    state.payPassword = state.payPassword.slice(0, -1);
+    render();
+}
+
+
+// 初始化
+orderNo = getParam('order_no');
+if (!orderNo) {
+    state.loading = false;
+    state.orderInfo = null;
+    render();
+} else {
+    state.isLoggedIn = !!getToken();
+    if (state.isLoggedIn) {
+        // 已登录时先获取用户信息拿余额，再加载订单
+        apiGet('/user').then(function(res) {
+            if (res.code === 0 && res.data) {
+                state.userBalance = (res.data.balance !== undefined) ? res.data.balance : null;
+            }
+            loadOrder();
+        }).catch(function() {
+            loadOrder();
+        });
+    } else {
+        state.loading = false;
+        render();
+    }
+}
+
+// 回车登录
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !state.isLoggedIn && !state.loginLoading) {
+        doLogin();
+    }
+});
+
+// 维护模式提示
+function showMaintenance(msg) {
+    var existing = document.getElementById('maintenanceOverlay');
+    if (existing) return;
+    var overlay = document.createElement('div');
+    overlay.id = 'maintenanceOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:16px;padding:40px 30px;max-width:360px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2);">' +
+        '<div style="font-size:48px;margin-bottom:16px;">\uD83D\uDD27</div>' +
+        '<div style="font-size:18px;font-weight:600;color:#333;margin-bottom:12px;">系统维护中</div>' +
+        '<div style="font-size:14px;color:#666;line-height:1.6;">' + msg + '</div>' +
+        '</div>';
+    document.body.appendChild(overlay);
+}
+</script>
+</body>
+</html>

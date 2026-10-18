@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>订单管理</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+body{padding:20px;background:#f5f6fa;margin:0}
+.toolbar{background:#fff;padding:16px 20px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.toolbar select,.toolbar input{height:36px;border:1px solid #e6e6e6;border-radius:4px;padding:0 10px}
+.toolbar input{width:160px}
+.table-wrap{background:#fff;padding:0 20px 20px;border-radius:0 0 8px 8px}
+</style>
+</head>
+<body>
+<div class="toolbar">
+    <input type="text" id="searchOrderNo" placeholder="订单号搜索" autocomplete="off">
+    <input type="text" id="searchUserId" placeholder="用户ID搜索" autocomplete="off">
+    <select id="filterStatus">
+        <option value="">全部状态</option>
+        <option value="pending">挂单中</option>
+        <option value="trading">正在交易</option>
+        <option value="buyer_cancel">买方取消</option>
+        <option value="offline">下架</option>
+        <option value="completed">已完成</option>
+        <option value="seller_cancel">卖方取消</option>
+    </select>
+    <button class="layui-btn layui-btn-sm" id="btnSearch" style="background:#2979FF">
+        <i class="layui-icon layui-icon-search"></i> 搜索
+    </button>
+</div>
+<div class="table-wrap">
+    <table class="layui-table" id="orderTable" lay-filter="orderTable"></table>
+</div>
+
+<script type="text/html" id="statusTpl">
+{{# if(d.status_text === '挂单中'){ }}
+    <span class="layui-badge layui-bg-blue">挂单中</span>
+{{# } else if(d.status_text === '正在交易'){ }}
+    <span class="layui-badge layui-bg-orange">正在交易</span>
+{{# } else if(d.status_text === '买方取消'){ }}
+    <span class="layui-badge layui-bg-gray">买方取消</span>
+{{# } else if(d.status_text === '下架'){ }}
+    <span class="layui-badge layui-bg-gray">下架</span>
+{{# } else if(d.status_text === '已完成'){ }}
+    <span class="layui-badge layui-bg-green">已完成</span>
+{{# } else if(d.status_text === '卖方取消'){ }}
+    <span class="layui-badge" style="background:#FF5722">卖方取消</span>
+{{# } else { }}
+    <span class="layui-badge layui-bg-gray">未知</span>
+{{# } }}
+</script>
+
+<script type="text/html" id="lockedTpl">
+{{# if(d.locked == 1){ }}
+    <span class="layui-badge" style="background:#FF5722">是</span>
+{{# } else { }}
+    <span class="layui-badge layui-bg-green">否</span>
+{{# } }}
+</script>
+
+<script type="text/html" id="orderBar">
+{{# if(d.status == 1 || d.status == 2){ }}
+    <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="close">强制关闭</a>
+{{# } }}
+<a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="del" style="margin-left:5px">删除</a>
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+layui.use(['table','layer','jquery'],function(){
+    var table=layui.table,layer=layui.layer,$=layui.$;
+    var token=localStorage.getItem('admin_token')||'';
+
+    function getSearchParams(){
+        return {
+            order_no:$('#searchOrderNo').val()||'',
+            user_id:$('#searchUserId').val()||'',
+            display_status:$('#filterStatus').val()||''
+        };
+    }
+
+    table.render({
+        elem:'#orderTable',
+        url:'/index/adminOrderListData',
+        headers:{'Authorization':'Bearer '+token},
+        where:{},
+        parseData:function(r){
+            return{code:r.code===0?0:1,msg:r.msg||'',count:r.data?r.data.total:0,data:r.data?r.data.list:[]};
+        },
+        page:true,
+        limit:15,
+        limits:[10,15,30,50],
+        cols:[[
+            {field:'id',title:'ID',width:70,sort:true},
+            {field:'order_no',title:'订单号',width:200},
+            {field:'user_id',title:'卖方ID',width:90},
+            {field:'buyer_id',title:'买方ID',width:90,templet:function(d){return d.buyer_id||'-';}},
+            {field:'amount',title:'数量',width:100,templet:function(d){return parseFloat(d.amount||0).toFixed(2);}},
+             {field:'sold_amount', title:'实际售出', width:100, templet:function(d){ return d.sold_amount > 0 ? d.sold_amount : '-'; }},
+      {field:'transaction_count', title:'单量', width:80, templet:function(d){ return d.transaction_count > 0 ? d.transaction_count : '-'; }},
+            {field:'unit_price',title:'单价',width:90,templet:function(d){return '￥'+parseFloat(d.unit_price||0).toFixed(4);}},
+            {field:'locked',title:'锁定',width:80,templet:'#lockedTpl'},
+            {field:'status_text',title:'状态',width:100,templet:'#statusTpl'},
+            {field:'created_at',title:'创建时间',width:170},
+            {title:'操作',width:160,toolbar:'#orderBar',fixed:'right'}
+        ]]
+    });
+
+    $('#btnSearch').on('click',function(){
+        table.reload('orderTable',{
+            where:getSearchParams(),
+            page:{curr:1}
+        });
+    });
+
+    $('#searchOrderNo,#searchUserId').on('keydown',function(e){
+        if(e.keyCode===13){$('#btnSearch').click();}
+    });
+
+    table.on('tool(orderTable)',function(obj){
+        var data=obj.data;
+        if(obj.event==='close'){
+            layer.confirm('确认强制关闭该订单？未售出积分将退还给卖方。',function(index){
+                $.ajax({
+                    url:'/index/adminForceCloseOrder',
+                    type:'POST',
+                    headers:{'Authorization':'Bearer '+token},
+                    contentType:'application/json',
+                    data:JSON.stringify({id:data.id}),
+                    success:function(res){
+                        if(res.code===0){
+                            layer.msg('已关闭',{icon:1});
+                            table.reload('orderTable');
+                        }else{
+                            layer.msg(res.msg||'演示系统只能预览功能,不能做数据操作！',{icon:2});
+                        }
+                    }
+                });
+                layer.close(index);
+            });
+        }
+        if(obj.event==='del'){
+            layer.confirm('确定要删除订单 #' + data.id + ' 吗？此操作将从数据库永久删除，不可恢复！',function(index){
+                layer.close(index);
+                $.ajax({
+                    url:'/index/adminOrderDelete?id='+data.id,
+                    type:'GET',
+                    headers:{'Authorization':'Bearer '+token},
+                    dataType:'json',
+                    success:function(res){
+                        if(res&&res.code===0){
+                            layer.msg('删除成功',{icon:1,time:1500},function(){
+                                table.reload('orderTable');
+                            });
+                        }else{
+                            layer.msg((res&&res.msg)?res.msg:'删除失败',{icon:2,time:3000});
+                        }
+                    },
+                    error:function(xhr){
+                        var msg='不允许删除，你删除后其他人还怎么看演示？';
+                        try{var res=JSON.parse(xhr.responseText);if(res.msg)msg=res.msg;}catch(e){}
+                        layer.msg(msg,{icon:2,time:3000});
+                    }
+                });
+            });
+        }
+    });
+});
+</script>
+</body>
+</html>

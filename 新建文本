@@ -1,0 +1,2 @@
+安装扩展：fileinfo,redis,imagemagick,exif,igbinary,zstd，SG16
+删除禁用函数：putenv       passthru

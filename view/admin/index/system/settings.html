@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统设置 - 积分管理系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@3.1.1/dist/css/layui.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; }
+        .content-card {
+            background: #fff; border-radius: 6px; padding: 24px 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .content-card .card-title {
+            font-size: 18px; font-weight: 600; color: #333;
+            margin-bottom: 24px; padding-bottom: 14px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .setting-group {
+            margin-bottom: 20px; padding: 16px 20px;
+            background: #fafafa; border-radius: 6px; border: 1px solid #eee;
+        }
+        .setting-group .group-title {
+            font-size: 14px; font-weight: 600; color: #2979FF; margin-bottom: 14px;
+        }
+        .setting-tips {
+            font-size: 12px; color: #999; margin-top: 4px; line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="content-card">
+        <div class="card-title">
+            <i class="layui-icon layui-icon-set" style="margin-right:6px;color:#2979FF;"></i>
+            系统设置
+        </div>
+        <form class="layui-form" id="settingsForm">
+            <!-- 基础设置 -->
+            <div class="setting-group">
+                <div class="group-title">基础设置</div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">系统名称</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="text" name="site_name" placeholder="请输入系统名称" class="layui-input" value="积分管理系统">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">积分名称</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="text" name="points_name" placeholder="如：积分、金币" class="layui-input" value="积分">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">积分单位</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="text" name="points_unit" placeholder="如：个、枚" class="layui-input" value="个">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 注册与认证 -->
+            <div class="setting-group">
+                <div class="group-title">注册与认证</div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">注册模式</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <select name="register_mode">
+                            <option value="all">手机号+邮箱</option>
+                            <option value="phone">仅手机号</option>
+                            <option value="email">仅邮箱</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">开放注册</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="checkbox" name="open_register" lay-skin="switch" lay-text="开|关" value="1" checked>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">注册需实名</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="checkbox" name="require_realname" lay-skin="switch" lay-text="开|关" value="1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 短信设置 (v6新增) -->
+            <div class="setting-group">
+                <div class="group-title">短信验证码设置</div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">启用短信</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="checkbox" name="sms_enabled" lay-skin="switch" lay-text="开|关" value="1">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">短信用户名</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="text" name="sms_uid" placeholder="smschinese.cn 用户名" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">短信密钥</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="password" name="sms_key" placeholder="smschinese.cn 接口密钥" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">短信签名</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="text" name="sms_sign" placeholder="如：【积分商城】" class="layui-input">
+                    </div>
+                </div>
+                <div class="setting-tips" style="margin-left:120px;">
+                    短信接口：<a href="http://www.smschinese.cn" target="_blank" style="color:#2979FF;">smschinese.cn</a>，登录后在"用户中心"获取API密钥。验证码内容格式：签名+验证码，如【积分商城】您的验证码是123456。
+                </div>
+            </div>
+
+            <!-- 邮箱设置 (v6新增) -->
+            <div class="setting-group">
+                <div class="group-title">邮箱验证码设置</div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">启用邮箱</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="checkbox" name="email_enabled" lay-skin="switch" lay-text="开|关" value="1">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">SMTP服务器</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="text" name="smtp_host" placeholder="如：smtp.qq.com" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">SMTP端口</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="number" name="smtp_port" placeholder="如：465" class="layui-input" value="465">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">SMTP用户名</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="text" name="smtp_user" placeholder="发件邮箱地址" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">SMTP密码</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="password" name="smtp_pass" placeholder="SMTP授权密码（非邮箱登录密码）" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">发件人名称</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="text" name="smtp_from_name" placeholder="如：积分商城" class="layui-input">
+                    </div>
+                </div>
+                <div class="setting-tips" style="margin-left:120px;">
+                    常用SMTP配置：<br>
+                    QQ邮箱：smtp.qq.com，端口465，密码为QQ邮箱授权码<br>
+                    163邮箱：smtp.163.com，端口465，密码为163邮箱授权码<br>
+                    阿里云邮箱：smtp.aliyun.com，端口465
+                </div>
+            </div>
+
+            <!-- 交易设置 -->
+            <div class="setting-group">
+                <div class="group-title">交易设置</div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">交易手续费(%)</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="number" name="trade_fee_rate" placeholder="手续费百分比" class="layui-input" value="0">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">最低交易金额</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="number" name="min_trade_amount" placeholder="最低交易金额" class="layui-input" value="1">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">订单超时(分钟)</label>
+                    <div class="layui-input-block" style="margin-left:120px;">
+                        <input type="number" name="order_timeout" placeholder="订单超时分钟数" class="layui-input" value="30">
+                    </div>
+                </div>
+            </div>
+
+            <div class="layui-form-item" style="margin-top:24px;">
+                <div class="layui-input-block" style="margin-left:120px;">
+                    <button type="button" class="layui-btn" id="btnSave" style="background:#2979FF;">保存设置</button>
+                    <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/layui@3.1.1/dist/layui.js"></script>
+    <script>
+        var __apiToken = '';
+        window.addEventListener('message', function(e) { if (e.data && e.data.type === 'setToken') __apiToken = e.data.token; });
+
+        layui.use(['form', 'layer'], function() {
+            var form = layui.form;
+            var layer = layui.layer;
+            var $ = layui.$;
+
+            function getAuthHeaders() {
+                return { 'Authorization': 'Bearer ' + __apiToken };
+            }
+
+            // 加载现有设置
+            function loadSettings() {
+                $.ajax({
+                    url: '/admin/system/settings',
+                    headers: getAuthHeaders(),
+                    success: function(res) {
+                        if (res.code === 0 && res.data) {
+                            var settings = {};
+                            if (Array.isArray(res.data)) {
+                                res.data.forEach(function(item) {
+                                    settings[item.setting_key] = item.setting_value;
+                                });
+                            } else {
+                                settings = res.data;
+                            }
+                            // 填充表单
+                            $.each(settings, function(key, val) {
+                                var $el = $('[name="' + key + '"]');
+                                if ($el.length) {
+                                    if ($el.attr('type') === 'checkbox') {
+                                        $el.prop('checked', val == '1');
+                                    } else {
+                                        $el.val(val);
+                                    }
+                                }
+                            });
+                            form.render();
+                        }
+                    }
+                });
+            }
+
+            // 保存设置
+            $('#btnSave').on('click', function() {
+                var formData = {};
+                $('#settingsForm').find('input,select').each(function() {
+                    var name = $(this).attr('name');
+                    if (!name) return;
+                    if ($(this).attr('type') === 'checkbox') {
+                        formData[name] = $(this).is(':checked') ? '1' : '0';
+                    } else {
+                        formData[name] = $(this).val();
+                    }
+                });
+
+                var settingsArr = [];
+                $.each(formData, function(key, val) {
+                    settingsArr.push({ key: key, value: val });
+                });
+
+                var loadIdx = layer.load(1);
+                $.ajax({
+                    url: '/admin/system/settings',
+                    type: 'POST',
+                    headers: getAuthHeaders(),
+                    contentType: 'application/json',
+                    data: JSON.stringify({ settings: settingsArr }),
+                    success: function(res) {
+                        layer.close(loadIdx);
+                        if (res.code === 0) {
+                            layer.msg('设置已保存', {icon: 1});
+                        } else {
+                            layer.msg(res.msg || '保存失败', {icon: 2});
+                        }
+                    },
+                    error: function() {
+                        layer.close(loadIdx);
+                        layer.msg('网络错误', {icon: 2});
+                    }
+                });
+            });
+
+            loadSettings();
+        });
+    </script>
+</body>
+</html>

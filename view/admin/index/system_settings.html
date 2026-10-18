@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>系统设置</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/css/layui.css">
+<style>
+.settings-section{margin-bottom:25px;padding-bottom:20px;border-bottom:1px solid #e8e8e8}
+.settings-section:last-child{border-bottom:none}
+.section-title{font-size:16px;font-weight:bold;color:#333;margin-bottom:15px;padding-left:10px;border-left:3px solid #1E9FFF}
+</style>
+</head>
+<body style="padding:20px;background:#f5f6fa">
+<div style="background:#fff;padding:30px;border-radius:8px;max-width:700px">
+<h3 style="margin-bottom:25px">系统设置</h3>
+<form class="layui-form" lay-filter="settingsForm">
+
+<!-- 网络维护 -->
+<div class="settings-section">
+<div class="section-title" style="border-left-color:#FF5722">网络维护</div>
+<div class="layui-form-item"><label class="layui-form-label">维护开关</label><div class="layui-input-block"><input type="checkbox" name="maintenance_mode" lay-skin="switch" lay-text="开启|关闭"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">维护提示语</label><div class="layui-input-block"><textarea name="maintenance_message" class="layui-textarea" placeholder="如：系统正在升级维护中，预计2小时后恢复，请稍后再试。" style="height:80px"></textarea></div></div>
+<div class="layui-form-item"><label class="layui-form-label"></label><div class="layui-input-block"><div style="padding:9px 0;color:#FF5722;font-size:13px">⚠️ 开启后，APP和H5前端所有接口将无法访问，用户会看到维护提示页面。后台管理不受影响。</div></div></div>
+</div>
+
+<!-- 基础设置 -->
+<div class="settings-section">
+<div class="section-title">基础设置</div>
+<div class="layui-form-item"><label class="layui-form-label">系统名称</label><div class="layui-input-block"><input type="text" name="site_name" class="layui-input" placeholder="系统显示名称"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">后端网址</label><div class="layui-input-block"><input type="text" name="backend_url" class="layui-input" placeholder="如：https://www.baidu.com（用于拼接广告图片等完整URL）"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">商户端网址</label><div class="layui-input-block"><input type="text" name="merchant_url" class="layui-input" placeholder="如：https://mer.baidu.com（商户平台和支付页面地址）"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">积分名称</label><div class="layui-input-block"><input type="text" name="points_name" class="layui-input" placeholder="如：金币、积分"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">实名认证</label><div class="layui-input-block"><input type="checkbox" name="real_name_required" lay-skin="switch" lay-text="开启|关闭"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">商户认证</label><div class="layui-input-block"><input type="checkbox" name="merchant_required" lay-skin="switch" lay-text="开启|关闭"></div></div>
+</div>
+
+<!-- 注册模式 -->
+<div class="settings-section">
+<div class="section-title">注册模式</div>
+<div class="layui-form-item"><label class="layui-form-label">注册方式</label><div class="layui-input-block">
+<select name="register_mode">
+<option value="phone">仅手机号注册</option>
+<option value="email">仅邮箱注册</option>
+<option value="both">手机号+邮箱都支持</option>
+</select>
+</div></div>
+</div>
+
+<!-- 短信设置 -->
+<div class="settings-section">
+<div class="section-title">短信验证码</div>
+<div class="layui-form-item"><label class="layui-form-label">启用短信</label><div class="layui-input-block"><input type="checkbox" name="sms_enabled" lay-skin="switch" lay-text="开启|关闭"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">短信通Uid</label><div class="layui-input-block"><input type="text" name="sms_uid" class="layui-input" placeholder="短信通平台用户名"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">短信通Key</label><div class="layui-input-block"><input type="text" name="sms_key" class="layui-input" placeholder="短信通接口密钥"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">短信签名</label><div class="layui-input-block"><input type="text" name="sms_sign" class="layui-input" placeholder="短信签名内容"></div></div>
+</div>
+
+<!-- 邮箱设置 -->
+<div class="settings-section">
+<div class="section-title">邮箱验证码</div>
+<div class="layui-form-item"><label class="layui-form-label">启用邮箱</label><div class="layui-input-block"><input type="checkbox" name="email_enabled" lay-skin="switch" lay-text="开启|关闭"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">SMTP服务器</label><div class="layui-input-block"><input type="text" name="smtp_host" class="layui-input" placeholder="如：smtp.qq.com"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">SMTP端口</label><div class="layui-input-block"><input type="text" name="smtp_port" class="layui-input" placeholder="SSL端口通常为465"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">SMTP用户名</label><div class="layui-input-block"><input type="text" name="smtp_user" class="layui-input" placeholder="发件邮箱地址"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">SMTP密码</label><div class="layui-input-block"><input type="password" name="smtp_pass" class="layui-input" placeholder="邮箱密码或授权码"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">发件人名称</label><div class="layui-input-block"><input type="text" name="smtp_from_name" class="layui-input" placeholder="收件人看到的发件人名称"></div></div>
+</div>
+
+<!-- 游戏设置 -->
+<div class="settings-section">
+<div class="section-title" style="border-left-color:#FF9800">游戏中心</div>
+<div class="layui-form-item"><label class="layui-form-label">游戏开关</label><div class="layui-input-block"><input type="checkbox" name="game_enabled" lay-skin="switch" lay-text="开启|关闭"></div></div>
+<div class="layui-form-item"><label class="layui-form-label"></label><div class="layui-input-block"><div style="padding:9px 0;color:#999;font-size:13px">关闭后，APP首页的游戏浮标将隐藏，用户无法进入游戏中心。</div></div></div>
+</div>
+
+<!-- 推荐设置 -->
+<div class="settings-section">
+<div class="section-title">推荐设置</div>
+<div class="layui-form-item"><label class="layui-form-label">推荐奖励积分</label><div class="layui-input-block"><input type="number" name="referral_reward" class="layui-input" placeholder="如：50 表示奖励50积分" step="0.01"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">说明</label><div class="layui-input-block"><div style="padding:9px 0;color:#999;font-size:13px">被推荐人完成首笔买入交易且金额达到门槛时，推荐人获得此积分奖励。设为0或留空则不启用。</div></div></div>
+<div class="layui-form-item"><label class="layui-form-label">最低交易金额</label><div class="layui-input-block"><input type="number" name="referral_min_trade_amount" class="layui-input" placeholder="如：100" step="0.01"></div></div>
+<div class="layui-form-item"><label class="layui-form-label">说明</label><div class="layui-input-block"><div style="padding:9px 0;color:#999;font-size:13px">被推荐人首笔买入交易的积分数量需达到此值才触发推荐奖励。</div></div></div>
+</div>
+
+<!-- 协议隐私设置 -->
+<div class="settings-section">
+<div class="section-title">协议隐私设置</div>
+<div class="layui-form-item"><label class="layui-form-label">用户协议</label><div class="layui-input-block"><textarea name="user_agreement" class="layui-textarea" placeholder="请输入用户协议内容" style="height:200px"></textarea></div></div>
+<div class="layui-form-item"><label class="layui-form-label">隐私政策</label><div class="layui-input-block"><textarea name="privacy_policy" class="layui-textarea" placeholder="请输入隐私政策内容" style="height:200px"></textarea></div></div>
+</div>
+
+<div class="layui-form-item"><div class="layui-input-block"><button class="layui-btn layui-btn-normal" lay-submit lay-filter="saveSettings">保存设置</button></div></div>
+</form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.8/dist/layui.js"></script>
+<script>
+// 从服务器加载当前设置
+var settingsData = {$settingsJson|raw};
+
+layui.use(['form','layer'], function(){
+    var form = layui.form;
+    var layer = layui.layer;
+
+    // 填充当前设置值
+    if(settingsData){
+        // 处理开关值：将 "0"/"1" 转为 checkbox 的 checked 状态
+        var switchFields = ['real_name_required','merchant_required','sms_enabled','email_enabled','maintenance_mode','game_enabled'];
+        for(var i=0;i<switchFields.length;i++){
+            var f = switchFields[i];
+            if(settingsData[f]==='1'||settingsData[f]===1){
+                settingsData[f] = true;
+            } else {
+                delete settingsData[f];
+            }
+        }
+        form.val('settingsForm', settingsData);
+    }
+
+    // 保存设置
+    form.on('submit(saveSettings)', function(data){
+        // 处理开关字段未选中时不在data.field中的情况
+        var switchFields = ['real_name_required','merchant_required','sms_enabled','email_enabled','maintenance_mode','game_enabled'];
+        for(var i=0;i<switchFields.length;i++){
+            var f = switchFields[i];
+            if(!(f in data.field)){
+                data.field[f] = '0';
+            }
+        }
+        fetch('/index/adminSystemSettingsSave', {
+            method: 'POST',
+            body: JSON.stringify(data.field),
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (localStorage.getItem('admin_token') || '')
+            }
+        }).then(function(r){ return r.json() }).then(function(r){
+            layer.msg(r.code===0 ? '保存成功' : (r.msg||'保存失败'));
+        }).catch(function(e){
+            layer.msg('对不起，演示系统无法删该数据！');
+        });
+        return false;
+    });
+});
+</script>
+</body></html>

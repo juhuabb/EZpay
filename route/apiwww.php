@@ -1,0 +1,85 @@
+<?php
+use think\facade\Route;
+
+// ========== CORS 预检请求处理（必须在所有路由之前） ==========
+// 公开接口 OPTIONS
+Route::options('api/:path', function(){ return response('', 204); })
+    ->pattern(['path' => '.*'])
+    ->middleware(\app\middleware\CorsMiddleware::class);
+
+// 无需认证的路由
+Route::group('api', function () {
+    // 认证 - 登录/注册
+    Route::post('auth/login', 'api.Auth/login');
+    Route::post('auth/register', 'api.Auth/register');
+    Route::post('auth/refresh', 'api.Auth/refreshToken');
+    Route::get('auth/register-mode', 'api.Auth/registerMode');
+    Route::post('auth/send-sms-code', 'api.Auth/sendSmsCode');
+    Route::post('auth/send-email-code', 'api.Auth/sendEmailCode');
+    // 首页数据
+    Route::get('index/home', 'api.Index/homeData');
+    Route::get('index/faq', 'api.Index/faqList');
+    // 公告
+    Route::get('announcements', 'api.Announcement/list');
+    // 市场行情（无需登录）
+    Route::get('market', 'api.Order/marketList');
+})->middleware(\app\middleware\CorsMiddleware::class);
+
+// 需要认证的路由
+Route::group('api', function () {
+    // 文件上传
+    Route::post('upload/image', 'api.Upload/image');
+    Route::post('upload/avatar', 'api.Upload/avatar');
+    // 认证 - 登出
+    Route::post('auth/logout', 'api.Auth/logout');
+    // 用户相关
+    Route::get('user/profile', 'api.User/profile');
+    Route::put('user/profile', 'api.User/updateProfile');
+    Route::put('user/password', 'api.User/changePassword');
+    Route::put('user/pay-password', 'api.User/changePayPassword');
+    Route::get('user/balance', 'api.User/balance');
+    Route::get('user/balance-log', 'api.User/balanceLog');
+    // 认证相关
+    Route::post('verify/real-name', 'api.Verify/submitRealName');
+    Route::get('verify/real-name/status', 'api.Verify/verifyStatus');
+    Route::post('verify/merchant', 'api.Verify/submitMerchant');
+    Route::get('verify/merchant/status', 'api.Verify/merchantStatus');
+    Route::post('verify/totp/bind', 'api.Verify/bindTotp');
+    Route::post('verify/totp/verify', 'api.Verify/verifyTotp');
+    // 订单（挂单）
+    Route::post('orders', 'api.Order/createOrder');
+    Route::put('orders/:id', 'api.Order/updateOrder');
+    Route::delete('orders/:id', 'api.Order/deleteOrder');
+    Route::get('orders/my', 'api.Order/myOrders');
+    // 交易
+    Route::post('transactions', 'api.Transaction/createTransaction');
+    Route::get('transactions/my', 'api.Transaction/myTransactions');
+    Route::get('transactions/:id', 'api.Transaction/transactionDetail');
+    // 收款方式
+    Route::get('payments', 'api.Payment/listPaymentMethods');
+    Route::post('payments', 'api.Payment/addPaymentMethod');
+    Route::put('payments/:id', 'api.Payment/updatePaymentMethod');
+    Route::delete('payments/:id', 'api.Payment/deletePaymentMethod');
+    // 商户相关
+    Route::get('merchant/dashboard', 'api.Merchant/merchantDashboard');
+    Route::get('merchant/credentials', 'api.Merchant/apiCredentials');
+    Route::post('merchant/reset-keys', 'api.Merchant/resetApiKeys');
+    Route::post('merchant/reset-rsa', 'api.Merchant/resetRsaKeys');
+    Route::get('merchant/transactions', 'api.Merchant/merchantTransactions');
+        // 投诉
+    Route::get('complaint/my', 'api.Complaint/myComplaints');
+    Route::post('complaint/create', 'api.Complaint/create');
+    Route::post('complaint/upload', 'api.Complaint/uploadProof');
+    Route::get('complaint/:id', 'api.Complaint/detail')->pattern(['id' => '\d+']);
+    Route::post('complaint/:id/reply', 'api.Complaint/reply')->pattern(['id' => '\d+']);
+
+    
+    
+})->middleware([\app\middleware\CorsMiddleware::class, \app\middleware\JwtAuth::class]);
+
+// 商户支付API路由（使用商户API认证）
+Route::group('api/merchant', function () {
+    Route::post('pay', 'api.MerchantApi/pay');
+    Route::post('query', 'api.MerchantApi/query');
+    Route::post('refund', 'api.MerchantApi/refund');
+})->middleware([\app\middleware\CorsMiddleware::class, \app\middleware\MerchantApiAuth::class]);

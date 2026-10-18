@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商户详情 - 积分管理系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@3.1.1/dist/css/layui.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; }
+        .content-card {
+            background: #fff; border-radius: 6px; padding: 24px 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 20px;
+        }
+        .content-card .card-title {
+            font-size: 16px; font-weight: 600; color: #333;
+            margin-bottom: 16px; padding-bottom: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .content-card .card-title i { color: #2979FF; margin-right: 6px; }
+        .detail-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 30px; }
+        .detail-info .info-item { display: flex; padding: 8px 0; border-bottom: 1px dashed #f0f0f0; }
+        .detail-info .info-label { color: #999; width: 110px; flex-shrink: 0; }
+        .detail-info .info-value { color: #333; flex: 1; word-break: break-all; }
+        .key-display {
+            background: #f6f8fa; padding: 10px 14px; border-radius: 6px;
+            font-family: 'Courier New', monospace; font-size: 13px;
+            word-break: break-all; margin-bottom: 10px; position: relative;
+            border: 1px solid #e8e8e8;
+        }
+        .key-display .copy-btn {
+            position: absolute; right: 8px; top: 8px;
+            padding: 2px 8px; font-size: 12px; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="content-card">
+        <div class="card-title"><i class="layui-icon layui-icon-template-1"></i>商户基本信息</div>
+        <div class="detail-info" id="merchantInfo">
+            <div style="text-align:center;color:#999;padding:20px;grid-column:1/-1;">加载中...</div>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="card-title"><i class="layui-icon layui-icon-key"></i>API密钥</div>
+        <div id="apiKeys">
+            <div style="text-align:center;color:#999;padding:10px;">加载中...</div>
+        </div>
+        <div style="margin-top:16px;">
+            <button class="layui-btn layui-btn-danger layui-btn-sm" id="btnResetKeys">
+                <i class="layui-icon layui-icon-refresh"></i> 重置密钥
+            </button>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="card-title"><i class="layui-icon layui-icon-set"></i>支付设置</div>
+        <form class="layui-form" style="max-width:500px;">
+            <div class="layui-form-item">
+                <label class="layui-form-label">支付功能</label>
+                <div class="layui-input-block" style="margin-left:100px;">
+                    <input type="checkbox" name="payment_enabled" lay-skin="switch" lay-text="开|关" id="paymentSwitch">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">支付限额</label>
+                <div class="layui-input-block" style="margin-left:100px;">
+                    <input type="number" name="payment_limit" placeholder="单笔支付限额" class="layui-input" id="paymentLimit">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <div class="layui-input-block" style="margin-left:100px;">
+                    <button type="button" class="layui-btn" id="btnSavePayment" style="background:#2979FF;">保存设置</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="content-card">
+        <div class="card-title"><i class="layui-icon layui-icon-form"></i>快捷入口</div>
+        <div style="display:flex;gap:12px;">
+            <a class="layui-btn" id="linkOrders" style="background:#2979FF;">
+                <i class="layui-icon layui-icon-form"></i> 查看订单
+            </a>
+            <a class="layui-btn" id="linkTransactions" style="background:#2979FF;">
+                <i class="layui-icon layui-icon-rmb"></i> 查看交易
+            </a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/layui@3.1.1/dist/layui.js"></script>
+    <script>
+        var __apiToken = '';
+        window.addEventListener('message', function(e) { if (e.data && e.data.type === 'setToken') __apiToken = e.data.token; });
+
+        layui.use(['form', 'layer'], function() {
+            var form = layui.form;
+            var layer = layui.layer;
+            var $ = layui.$;
+            var merchantId = {$merchantId};
+
+            function getAuthHeaders() {
+                return { 'Authorization': 'Bearer ' + __apiToken };
+            }
+
+            // 加载商户信息
+            function loadMerchant() {
+                $.ajax({
+                    url: '/admin/merchants/' + merchantId,
+                    headers: getAuthHeaders(),
+                    success: function(res) {
+                        if (res.code === 0 && res.data) {
+                            var m = res.data;
+                            var statusText = '';
+                            if (m.status === 1) statusText = '<span class="layui-badge layui-bg-green">正常</span>';
+                            else if (m.status === 0) statusText = '<span class="layui-badge layui-bg-orange">待审核</span>';
+                            else statusText = '<span class="layui-badge">已拒绝</span>';
+
+                            var html = '' +
+                                '<div class="info-item"><div class="info-label">商户ID</div><div class="info-value">' + m.id + '</div></div>' +
+                                '<div class="info-item"><div class="info-label">商户名</div><div class="info-value">' + (m.user ? m.user.username : '-') + '</div></div>' +
+                                '<div class="info-item"><div class="info-label">企业名称</div><div class="info-value">' + (m.company_name||'-') + '</div></div>' +
+                                '<div class="info-item"><div class="info-label">营业执照号</div><div class="info-value">' + (m.license_no||'-') + '</div></div>' +
+                                '<div class="info-item"><div class="info-label">状态</div><div class="info-value">' + statusText + '</div></div>' +
+                                '<div class="info-item"><div class="info-label">创建时间</div><div class="info-value">' + (m.created_at||'-') + '</div></div>';
+                            $('#merchantInfo').html(html);
+
+                            // API密钥
+                            var keysHtml = '';
+                            if (m.api_key) {
+                                keysHtml += '<div style="margin-bottom:8px;color:#666;font-size:13px;">API Key：</div>' +
+                                    '<div class="key-display" id="apiKeyDisplay">' + m.api_key + '<button class="layui-btn layui-btn-sm layui-btn-primary copy-btn" data-target="apiKeyDisplay">复制</button></div>';
+                            }
+                            if (m.api_secret) {
+                                keysHtml += '<div style="margin-bottom:8px;color:#666;font-size:13px;margin-top:12px;">API Secret：</div>' +
+                                    '<div class="key-display" id="apiSecretDisplay">' + m.api_secret + '<button class="layui-btn layui-btn-sm layui-btn-primary copy-btn" data-target="apiSecretDisplay">复制</button></div>';
+                            }
+                            if (!keysHtml) keysHtml = '<p style="color:#999;">暂无API密钥</p>';
+                            $('#apiKeys').html(keysHtml);
+
+                            // 支付设置
+                            $('#paymentSwitch').prop('checked', m.payment_enabled == 1);
+                            $('#paymentLimit').val(m.payment_limit || 0);
+                            form.render();
+
+                            // 快捷链接
+                            $('#linkOrders').attr('href', 'javascript:;').on('click', function() {
+                                window.parent.postMessage({
+                                    type: 'navigate',
+                                    url: '/admin/view/orders?merchant_id=' + merchantId,
+                                    title: '订单管理'
+                                }, '*');
+                            });
+                            $('#linkTransactions').attr('href', 'javascript:;').on('click', function() {
+                                window.parent.postMessage({
+                                    type: 'navigate',
+                                    url: '/admin/view/transactions?merchant_id=' + merchantId,
+                                    title: '交易记录'
+                                }, '*');
+                            });
+                        }
+                    }
+                });
+            }
+
+            // 复制
+            $(document).on('click', '.copy-btn', function() {
+                var target = $(this).data('target');
+                var text = $('#' + target).clone().children().remove().end().text().trim();
+                var $input = $('<input>').val(text).appendTo('body').select();
+                document.execCommand('copy');
+                $input.remove();
+                layer.msg('已复制', {icon: 1, time: 800});
+            });
+
+            // 重置密钥
+            $('#btnResetKeys').on('click', function() {
+                layer.confirm('重置密钥后旧密钥将立即失效，确认重置？', {icon: 3}, function(index) {
+                    $.ajax({
+                        url: '/admin/merchants/' + merchantId + '/reset-keys',
+                        type: 'POST',
+                        headers: getAuthHeaders(),
+                        success: function(res) {
+                            if (res.code === 0) {
+                                layer.msg('密钥已重置', {icon: 1});
+                                loadMerchant();
+                            } else {
+                                layer.msg(res.msg, {icon: 2});
+                            }
+                        }
+                    });
+                    layer.close(index);
+                });
+            });
+
+            // 保存支付设置
+            $('#btnSavePayment').on('click', function() {
+                var limit = $('#paymentLimit').val();
+                $.ajax({
+                    url: '/admin/merchants/' + merchantId + '/payment-limit',
+                    type: 'POST',
+                    headers: getAuthHeaders(),
+                    contentType: 'application/json',
+                    data: JSON.stringify({ payment_limit: limit }),
+                    success: function(res) {
+                        if (res.code === 0) {
+                            layer.msg('设置已保存', {icon: 1});
+                        } else {
+                            layer.msg(res.msg, {icon: 2});
+                        }
+                    }
+                });
+            });
+
+            // 支付开关
+            form.on('switch', function(data) {
+                $.ajax({
+                    url: '/admin/merchants/' + merchantId + '/toggle-payment',
+                    type: 'POST',
+                    headers: getAuthHeaders(),
+                    success: function(res) {
+                        if (res.code === 0) {
+                            layer.msg(res.msg, {icon: 1});
+                        } else {
+                            layer.msg(res.msg, {icon: 2});
+                            // 恢复开关状态
+                            data.elem.checked = !data.elem.checked;
+                            form.render('checkbox');
+                        }
+                    }
+                });
+            });
+
+            loadMerchant();
+        });
+    </script>
+</body>
+</html>
