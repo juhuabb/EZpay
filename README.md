@@ -6,6 +6,10 @@
 ##  环境
 php>8.0   mysql 5.7   
 
+##  全部打包下载
+全部打包-含服务器的，数据库，商户端，用户前端
+通过网盘分享的文件：B2B钱包仿OK钱包-仿EZ钱包源码-发布版.zip
+链接: https://pan.baidu.com/s/1fhAoDP8bAw6YtSDQr_gMMg?pwd=jven 提取码: jven 
 
 
 ![](https://github.com/juhuabb/EZpay/blob/main/img/0261018171103.jpg)
