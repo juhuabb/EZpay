@@ -5,4 +5,11 @@
 用户xiaiai  密码  123123
 ##  环境
 php>8.0   mysql 5.7   
+
+
+
+![](https://github.com/juhuabb/EZpay/blob/main/img/0261018171103.jpg)
+![](https://github.com/juhuabb/EZpay/blob/main/img/1018171027.jpg)
+
+![](https://github.com/juhuabb/EZpay/blob/main/img/20261018171134.jpg)
 ![](https://github.com/juhuabb/EZpay/blob/main/img/20261018171153.jpg)
