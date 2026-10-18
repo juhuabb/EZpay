@@ -3,3 +3,5 @@
 伪静态为Thinkphp，申请开通SSL，
 后台登录   https://你的域名/index/admin
 用户xiaiai  密码  123123
+##环境
+php>8.0   mysql 5.7   
